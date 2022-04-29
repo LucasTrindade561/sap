@@ -1,0 +1,110 @@
+FUNCTION z_get_bukrs_werks.
+*"----------------------------------------------------------------------
+*"*"Local Interface:
+*"  IMPORTING
+*"     REFERENCE(IV_BUKRS) TYPE  BUKRS
+*"     REFERENCE(IV_WERKS) TYPE  WERKS_D
+*"  EXPORTING
+*"     REFERENCE(GT_RETURN) TYPE  ZSGTRETURN
+*"  TABLES
+*"      GT_FILIAIS STRUCTURE  ZSGTFILIAL
+*"----------------------------------------------------------------------
+  CLEAR: gt_return, gt_filiais.
+
+* Tabelas Transparentes
+  TABLES: zt008, zt008w.
+
+* Variaveis locais
+  DATA: vl_bukrs TYPE bukrs,
+        vl_werks TYPE werks_d.
+
+* Variaveis
+  DATA: lv_log TYPE c.
+
+* Tabela Interna
+  DATA: t_filial     TYPE TABLE OF zsgtfilial,
+        t_zsgtfilial TYPE TABLE OF zsgtfilial.
+
+* Work Area
+  DATA: wa_filial     TYPE zsgtfilial,
+        wa_zsgtfilial TYPE zsgtfilial.
+
+
+  IF iv_bukrs IS INITIAL.
+    gt_return-type = 'E'.
+    gt_return-message = 'Informar uma empresa.'.
+    lv_log = abap_false.
+  ELSEIF iv_bukrs <> space.
+    SELECT SINGLE bukrs FROM zt008 INTO vl_bukrs WHERE bukrs = iv_bukrs.
+    IF sy-subrc <> 0.
+      gt_return-type = 'E'.
+      gt_return-message = 'Empresa não cadastrada.'.
+      lv_log = abap_false.
+    ELSE.
+      lv_log = abap_true.
+    ENDIF.
+  ENDIF.
+
+  IF iv_werks <> space.
+    SELECT SINGLE werks FROM zt008w INTO vl_werks WHERE werks = iv_werks.
+    IF sy-subrc <> 0.
+      gt_return-type = 'E'.
+      gt_return-message = 'Centro/Filiais não cadastrado.'.
+      lv_log = abap_false.
+    ELSE.
+      lv_log = abap_true.
+    ENDIF.
+  ENDIF.
+
+  IF lv_log <> space.
+    IF iv_werks EQ space.
+      SELECT
+        zt008~bukrs
+        zt008~butxt
+        zt008~ort01
+        zt008w~werks
+        zt008w~name1
+        zt008w~stras
+        zt008w~pstlz
+        zt008w~ort01
+        FROM zt008
+       LEFT JOIN zt008w
+        ON zt008~bukrs = zt008w~bukrs
+       INTO TABLE t_filial
+     WHERE zt008~bukrs = iv_bukrs.
+    ELSE.
+      SELECT
+        zt008~bukrs
+        zt008~butxt
+        zt008~ort01
+        zt008w~werks
+        zt008w~name1
+        zt008w~stras
+        zt008w~pstlz
+        zt008w~ort01
+        FROM zt008
+       INNER JOIN zt008w
+        ON zt008~bukrs = zt008w~bukrs
+       INTO TABLE t_filial
+     WHERE zt008~bukrs = iv_bukrs
+      AND zt008w~werks = iv_werks.
+    ENDIF.
+
+    LOOP AT t_filial INTO wa_filial.
+      wa_zsgtfilial-bukrs  = wa_filial-bukrs.
+      wa_zsgtfilial-butxt  = wa_filial-butxt.
+      wa_zsgtfilial-ort01e = wa_filial-ort01e.
+      wa_zsgtfilial-werks  = wa_filial-werks.
+      wa_zsgtfilial-name1  = wa_filial-name1.
+      wa_zsgtfilial-stras  = wa_filial-stras.
+      wa_zsgtfilial-pstlz  = wa_filial-pstlz.
+      wa_zsgtfilial-ort01c = wa_filial-ort01c.
+      APPEND wa_zsgtfilial TO gt_filiais.
+    ENDLOOP.
+
+    gt_return-type = 'S'.
+    gt_return-message = 'Dados selecionados com sucesso.'.
+  ENDIF.
+
+
+ENDFUNCTION.
