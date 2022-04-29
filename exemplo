@@ -1,0 +1,14 @@
+*      READ TABLE t_zt007 INTO wa_zt007 WITH KEY numpd = wa_saida-numpd itmpd = wa_saida-itmpd BINARY SEARCH.
+*
+*      IF sy-subrc IS INITIAL.
+*        READ TABLE t_zt006 INTO wa_zt006 WITH KEY numpd = wa_zt007-numpd BINARY SEARCH.
+*        IF sy-subrc = 0.
+*          PERFORM f_calculo_valor.
+*          IF sy-subrc = 0.
+*            PERFORM f_salvar_dados.
+*          ENDIF.
+*
+*        ENDIF.
+*      ENDIF.
+*
+*    ENDLOOP.
