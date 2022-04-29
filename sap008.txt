@@ -1,0 +1,109 @@
+*&---------------------------------------------------------------------*
+*& Report ZR00014
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+report zr00014.
+
+* declaracao de tipos
+types: begin of ty_material,
+         codmat(10) type c,
+         descri(35) type c,
+       end of ty_material.
+
+* declaracao de estruturas (work area)
+* Nesse exemplo estamos declarando 2 estruturas, porem de maneira diferente.
+data w_material type ty_material. "Melhor maneira
+
+data: begin of w_cliente,
+        codcli(10) type c,
+        nome(35)   type c,
+      end of w_cliente.
+
+* declarando tabela interna
+* Nesse exemplo estamos declarando 2 tabelas, porem de maneira diferente.
+data t_material type table of ty_material. " Sem header line
+
+" criando tabela interna com coisa direta. o 0 significa que não tem tamanho definido.
+" com header line.
+data: begin of t_fornec occurs 0,
+        codfor(10) type c,
+        nome(35)   type c,
+      end of t_fornec.
+
+* Inserindo registro na tabela interna
+* Inicio - exemplo append tabela interna com haeder line
+t_fornec-codfor = 'form-0001'.
+t_fornec-nome = 'apple'.
+append t_fornec.
+clear t_fornec. " limpando apenas a headler line (area de transferencia)
+
+t_fornec-codfor = 'form-0002'.
+t_fornec-nome = 'samsung'.
+append t_fornec.
+* fim - exemplo append com tabela interna com header line.
+
+* Inicio - exemplo append sem header line
+w_material-codmat = 'mat-0001'.
+w_material-descri = 'iphone 6'.
+append w_material to t_material. " adicionando dentro da tabela interna
+clear w_material.
+
+w_material-codmat = 'mat-0002'.
+w_material-descri = 'galaxy 6s'.
+append w_material to t_material.
+* fim - exemplo append com tabela interna sem header line.
+
+* utilizando o comando loop
+* loop tabela interna com HEADER LINE.
+loop at t_fornec where codfor = 'form-0001'.
+  write:/ 'Fornecedor:', t_fornec-codfor, t_fornec-nome, 'loop'.
+endloop.
+
+uline.
+* loop tabela interna sem HEADER LINE.
+* botamos o w_material aqui como into pq o w_material funciona com o work area / header line aqui para gente.
+loop at t_material into w_material.
+  write:/ 'Material', w_material-codmat, w_material-descri, 'loop 2'.
+endloop.
+uline.
+
+* Utilizando o comando read table.
+read table t_fornec with key codfor = 'form-0002'.
+if sy-subrc = 0. " se o sy-subrc = 0 --> deu certo.
+  write:/ 'Fornecedor:', t_fornec-codfor, t_fornec-nome, 'read table'.
+endif.
+
+read table t_fornec index 1.
+if sy-subrc = 0.
+  write:/ 'Fornecedor:', t_fornec-codfor, t_fornec-nome, 'read table'.
+endif.
+uline.
+
+read table t_material into w_material with key codmat = 'mat-0002'.
+if sy-subrc = 0.
+  write:/ 'Material', w_material-codmat, w_material-descri, 'read table'.
+endif.
+uline.
+
+* Utilizando o comando modify
+* sem header line
+loop at t_material into w_material.
+  concatenate w_material-descri 'Branco' into w_material-descri separated by space.
+  modify t_material from w_material transporting descri.
+endloop.
+
+* com header line
+loop at t_fornec.
+  concatenate t_fornec-nome 'SA' into t_fornec-nome SEPARATED BY space.
+  modify t_fornec transporting nome.
+endloop.
+
+* loop mostrando os materias e fornecedores atualizados.
+loop at t_material into w_material.
+  write:/ w_material-codmat, w_material-descri, 'Modify'.
+endloop.
+
+loop at t_fornec.
+  write:/ t_fornec-codfor, t_fornec-nome, 'Modify'.
+endloop.

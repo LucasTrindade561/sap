@@ -1,0 +1,37 @@
+function z_f0001.
+*"----------------------------------------------------------------------
+*"*"Local Interface:
+*"  IMPORTING
+*"     REFERENCE(NUMERO1) TYPE  I
+*"     REFERENCE(NUMERO2) TYPE  I
+*"     REFERENCE(OPERACAO) TYPE  C
+*"  EXPORTING
+*"     REFERENCE(RESULTADO) TYPE  I
+*"  EXCEPTIONS
+*"      INV_OPERADOR
+*"      DIV_ZERO
+*"----------------------------------------------------------------------
+
+  clear resultado.
+
+  " Valindando divisao por zero
+  if operacao = '/' and numero1 = '0'.
+    raise div_zero.
+  elseif operacao = '/' and numero2 = '0'.
+    raise div_zero.
+  endif.
+
+  case operacao.
+    when '+'.
+      resultado = numero1 + numero2.
+    when '-'.
+      resultado = numero1 - numero2.
+    when '*'.
+      resultado = numero1 * numero2.
+    when '/'.
+      resultado = numero1 / numero2.
+    when others.
+      raise inv_operador.
+  endcase.
+
+endfunction.

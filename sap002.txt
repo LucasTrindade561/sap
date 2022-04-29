@@ -1,0 +1,27 @@
+*&---------------------------------------------------------------------*
+*& Report ZR0007
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+report zr0007 message-id zc001.
+
+* declarando variavel
+data: v_resul type p decimals 2.
+
+* declarando selecao
+parameters: p_base   type p decimals 2,
+            p_larg   type p decimals 2.
+
+* condicional --> ver com o pai como fazer para que o decimal nao possa ter mais que dois, se n um aviso.
+if p_base = 0.
+  message i001.
+  stop.
+elseif  p_larg = 0.
+  message i002.
+  stop.
+endif.
+
+* fazendo o calculo
+v_resul = p_base *  p_larg.
+
+write: 'metros quadrado:', v_resul.

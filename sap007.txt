@@ -1,0 +1,19 @@
+*&---------------------------------------------------------------------*
+*& Report ZR00012
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+report zr00012.
+
+data: v_litros type p decimals 2,
+      v_valor  type p decimals 2.
+
+parameters: p_dist     type p decimals 2,
+            p_va_lt type p decimals 2,
+            p_km_lt type p decimals 2.
+
+v_litros = p_dist / p_km_lt / p_va_lt.
+v_valor = v_litros * P_va_lt.
+
+write:/ 'Quantidade de combustivel gasto:', v_litros,
+        'Valor total gasto:', v_valor.

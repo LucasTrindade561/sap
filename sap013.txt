@@ -1,0 +1,90 @@
+*&---------------------------------------------------------------------*
+*& Report ZR00019
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+report zr00019.
+
+* tabela transparente
+tables t005u.
+
+* tabela interna
+data: begin of t_t005u occurs 0,
+        land1 like t005u-land1,
+        bland like t005u-bland,
+        bezei like t005u-bezei,
+      end of t_t005u.
+
+* Tela de seleção
+selection-screen begin of block b01 with frame title text-001.
+select-options: s_land1 for t005u-land1,
+                s_bland for t005u-bland.
+selection-screen end of block b01.
+
+selection-screen begin of block b02 with frame title text-002.
+parameters: p_spras like t005u-spras default 'EN'.
+selection-screen end of block b02.
+
+initialization. " tratamentos antes que a tela de seleção chegue ao usuario
+  s_land1-low = 'BR'.
+  s_land1-sign = 'I'.
+  s_land1-option = 'EQ'.
+  append s_land1. clear s_land1.
+
+top-of-page. " usado para a criação de cabeçalho.
+  perform f_imprime_dados.
+
+start-of-selection. " determina o bloco principal de processamento.
+  perform f_seleciona_dados.
+
+  perform f_imprime_cabecalho.
+
+* break developer.
+
+form f_seleciona_dados.
+
+* Rotina de seleção
+  select land1 bland bezei
+    from t005u
+    into table t_t005u
+   where land1 in s_land1
+     and bland in s_bland
+     and spras = p_spras.
+
+  if sy-subrc <> 0.
+    message text-003 type 'I'. " Nenhum registro encontrado
+    stop.
+  endif.
+
+endform.
+
+form f_imprime_cabecalho.
+
+  format color 1.
+  uline /(35).
+  write: /1'|',
+         2 'Pais',
+         7 '|',
+         8 'Região',
+         14 '|',
+         15 'Denominação',
+         35, '|'.
+  uline /(35).
+  format reset.
+
+endform.
+
+form f_imprime_dados.
+
+  loop at t_t005u.
+    write: /1 '|',
+           2 t_t005u-land1,
+           7 '|',
+           8 t_t005u-bland,
+           14 '|',
+           15 t_t005u-bezei,
+           35, '|'.
+    uline /(35).
+  endloop.
+
+endform.

@@ -1,0 +1,29 @@
+*&---------------------------------------------------------------------*
+*& Report ZR0009
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+report zr0009.
+
+* Declarando varaivel
+data: v_imc type p decimals 2.
+
+* Declarando o parametro
+parameters: p_alt  type p decimals 2,
+            p_peso type p decimals 2.
+
+* Calculo imc
+v_imc = p_peso / p_alt ** 2.
+
+* Mostrando na tela
+if v_imc < '18.5'.
+  write:/ 'O imc ', v_imc, 'esta classificado como magreza'.
+elseif v_imc >= '18.5' and v_imc < '24.9'.
+  write:/ 'O imc ', v_imc, 'esta classificado como normal'.
+elseif v_imc >= '25' and v_imc < '29.9'.
+  write:/ 'O imc ' color 6, v_imc color 6, 'esta classificado como sobrepeso' color 6.
+elseif v_imc >= '30' and v_imc < '39.9'.
+  write:/ 'O imc ' color 6, v_imc color 6, 'esta classificado como obesidade' color 6.
+elseif v_imc > '40'.
+  write:/ 'O imc ', v_imc, 'esta classificado como obesidade grave' color 6 inverse.
+endif.

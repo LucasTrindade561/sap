@@ -1,0 +1,72 @@
+*&---------------------------------------------------------------------*
+*& Report ZR00015
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+report zr00015.
+
+* Tabelas trasnparentes --> sao tabelas do banco de dados.
+tables zt001.
+
+* Tela de selecao
+parameters: p_tpmat  like zt001-tpmat obligatory,
+            p_denom  like zt001-denom obligatory,
+            p_insert radiobutton group gr1,
+            p_update radiobutton group gr1,
+            p_modify radiobutton group gr1,
+            p_delete radiobutton group gr1.
+
+* Exemplo comando insert.
+if p_insert = 'X'.
+  clear zt001.
+  zt001-tpmat = p_tpmat.
+  zt001-denom = p_denom.
+  insert zt001. " insert zt001 --> esta somente gravado dentro daqui.
+  if sy-subrc = 0.
+    commit work.
+    message 'Registro cadastrado com sucesso' type 'S'.
+  else.
+    rollback work.
+    message 'Erro ao cadastrar.' type 'I'.
+  endif.
+
+* Exemplo com update
+elseif p_update = 'X'.
+  update zt001
+    set denom = p_denom
+  where tpmat = p_tpmat.
+  if sy-subrc = 0.
+    commit work.
+    message 'Registro atualizado com sucesso.' type 'S'.
+  else.
+    rollback work.
+    message 'Erro ao atualizar.' type 'I'.
+  endif.
+
+* Exemplo com modify
+elseif p_modify = 'X'.
+  clear zt001.
+  zt001-tpmat = p_tpmat.
+  zt001-denom = p_denom.
+  modify zt001.
+  if sy-subrc = 0.
+    commit work.
+    message 'Processo realizado com sucesso.' type 'S'.
+  else.
+    rollback work.
+    message 'Erro em realizar o processo.' type 'I'.
+  endif.
+
+* Exemplo com delete
+elseif p_delete = 'X'.
+  delete from zt001
+    where tpmat = p_tpmat.
+  if sy-subrc = 0.
+    commit work.
+    message 'Registro deletado com sucesso' type 'S'.
+  else.
+    rollback work.
+    message 'Erro deletar o registro.' type 'I'.
+  endif.
+
+endif.

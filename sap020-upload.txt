@@ -1,0 +1,141 @@
+*&---------------------------------------------------------------------*
+*& Report ZR00025
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+report zr00025.
+
+* tipos
+types: begin of ty_txt,
+         codigo(10)   type c,
+         nome(30)     type c,
+         telefone(14) type c,
+       end of ty_txt.
+
+types: begin of ty_csv,
+         line(100) type c,
+       end of ty_csv.
+
+* tabelas internas.
+data: t_txt type table of ty_txt.
+data: t_csv type table of ty_csv.
+
+* work are
+data: wa_txt type ty_txt.
+data: wa_csv type ty_csv.
+
+* tela de selecao
+parameters: p_file type localfile,
+            p_csv  radiobutton group gr1,
+            p_txt  radiobutton group gr1.
+
+* habilitando um matchcode.
+* sempre que alguem clicar em p_file fazer oq esta escrito abaixo.
+at selection-screen on value-request for p_file.
+  perform f_seleciona_arquivo.
+
+start-of-selection.
+  perform f_upload.
+  perform f_imprime_dados.
+
+form f_seleciona_arquivo.
+
+  call function 'KD_GET_FILENAME_ON_F4'
+    exporting
+*     PROGRAM_NAME  = SYST-REPID
+*     DYNPRO_NUMBER = SYST-DYNNR
+      field_name    = p_file
+*     STATIC        = ' '
+*     MASK          = ' '
+*     FILEOPERATION = 'R'
+*     PATH          =
+    changing
+      file_name     = p_file
+*     LOCATION_FLAG = 'P'
+    exceptions
+      mask_too_long = 1
+      others        = 2.
+
+  if sy-subrc <> 0.
+    message text-001 type 'I'. " erro ao selecionar arquivo
+  endif.
+
+endform.
+
+form f_upload.
+  data vl_filename type string. " variavel local
+
+* field-symbols --> um ponteiro de memoria, ele consegue se transformar em qualquer tipo de valor.
+* ele consegue receber todas as suas informacoes e dados.
+  field-symbols <tabela> type standard table.
+
+  vl_filename = p_file. " botando o p_file em string
+
+  if p_txt = 'X'.
+    assign t_txt to <tabela>. " assumir t_txt para <tabela>
+  else.
+    assign t_csv to <tabela>. " assumir t_csv para <tabela>
+  endif.
+
+  call function 'GUI_UPLOAD'
+    exporting
+      filename                = vl_filename
+      filetype                = 'ASC'
+*     HAS_FIELD_SEPARATOR     = ' '
+*     HEADER_LENGTH           = 0
+*     READ_BY_LINE            = 'X'
+*     DAT_MODE                = ' '
+*     CODEPAGE                = ' '
+*     IGNORE_CERR             = ABAP_TRUE
+*     REPLACEMENT             = '#'
+*     CHECK_BOM               = ' '
+*     VIRUS_SCAN_PROFILE      =
+*     NO_AUTH_CHECK           = ' '
+*   IMPORTING
+*     FILELENGTH              =
+*     HEADER                  =
+    tables
+      data_tab                = <tabela>
+*   CHANGING
+*     ISSCANPERFORMED         = ' '
+    exceptions
+      file_open_error         = 1
+      file_read_error         = 2
+      no_batch                = 3
+      gui_refuse_filetransfer = 4
+      invalid_type            = 5
+      no_authority            = 6
+      unknown_error           = 7
+      bad_data_format         = 8
+      header_not_allowed      = 9
+      separator_not_allowed   = 10
+      header_too_long         = 11
+      unknown_dp_error        = 12
+      access_denied           = 13
+      dp_out_of_memory        = 14
+      disk_full               = 15
+      dp_timeout              = 16
+      others                  = 17.
+
+  if sy-subrc <> 0.
+    message text-002 type 'I'. " Erro na abertura do arquivo.
+  endif.
+
+  if p_csv = 'X'.
+
+    loop at <tabela> into wa_csv.
+      split wa_csv at ';' into wa_txt-codigo wa_txt-nome wa_txt-telefone.
+      append wa_txt to t_txt. " estamos botando dentro t_txt para que conseguirmos ver o resultado.
+    endloop.
+
+  endif.
+
+endform.
+
+form f_imprime_dados.
+
+  loop at t_txt into wa_txt.
+    write:/ wa_txt-codigo, wa_txt-nome, wa_txt-telefone.
+  endloop.
+
+endform.

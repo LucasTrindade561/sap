@@ -1,0 +1,68 @@
+ *&---------------------------------------------------------------------*
+*& Report ZR00030
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+report zr00030.
+
+* tabela transparente
+tables zt006.
+
+* tipagem
+types: begin of ty_cabec,
+         numpd like zt006-numpd,
+         bukrs like zt006-bukrs,
+         forne like zt006-forne,
+         compr like zt006-compr,
+         waers like zt006-waers,
+         prazo like zt006-prazo,
+         datpd like zt006-datpd,
+         denom like zt004-denom,
+         cnpj  like zt004-cnpj,
+       end of ty_cabec.
+
+data: t_cabec type table of ty_cabec.
+
+* work area
+data wa_cabec type ty_cabec.
+
+selection-screen begin of block b01 with frame title text-001.
+select-options: s_numpd for zt006-numpd,
+                s_forne for zt006-forne.
+selection-screen end of block b01.
+
+start-of-selection.
+  perform f_selecao_dados.
+
+  perform f_imprime_dados.
+
+form f_selecao_dados.
+  select zt006~numpd zt006~bukrs zt006~forne zt006~compr zt006~waers zt006~prazo zt006~datpd
+         zt004~denom zt004~cnpj
+    from zt006
+    inner join zt004
+    on zt006~forne = zt004~forne
+    into table t_cabec
+    where zt006~numpd in s_numpd and
+          zt006~forne in s_forne.
+endform.
+
+form f_imprime_dados.
+  loop at t_cabec into wa_cabec.
+    write:/ wa_cabec-numpd,
+            wa_cabec-bukrs,
+            wa_cabec-forne,
+             wa_cabec-denom,
+            wa_cabec-cnpj,
+            wa_cabec-compr,
+            wa_cabec-waers,
+            wa_cabec-prazo,
+            wa_cabec-datpd.
+  endloop.
+
+  if sy-subrc <> 0.
+    message text-003 type 'I'.
+    stop.
+  endif.
+
+endform.

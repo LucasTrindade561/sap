@@ -1,0 +1,28 @@
+*&---------------------------------------------------------------------*
+*& Report ZR0008
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+report zr0008.
+
+* declarando variavel
+data: v_resul type p decimals 2.
+
+* parametros de selecao
+parameters: p_valor type p decimals 2,
+            p_porc type p decimals 2.
+
+* condicional
+if p_valor = 0.
+  message 'O numero nao pode ser zero' type 'I'.
+  stop.
+elseif  p_porc = 0.
+  message 'O numero nao pode ser zero' type 'I'.
+  stop.
+endif.
+
+* calculo da porcentagem
+v_resul = p_valor * p_porc / 100.
+
+* jogando na tela
+write:/ 'A porcentagem é ', v_resul.

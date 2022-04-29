@@ -1,0 +1,103 @@
+*&---------------------------------------------------------------------*
+*& Report ZR00020
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+report zr00020.
+
+tables zt001.
+data: t_zt001 type table of zt001.
+data wa_zt001 type zt001.
+
+selection-screen begin of block b01 with frame title text-001.
+parameters: p_tpmat  like zt001-tpmat obligatory,
+            p_denom  like zt001-denom obligatory,
+            p_insert radiobutton group gr1,
+            p_update radiobutton group gr1,
+            p_modify radiobutton group gr1,
+            p_delete radiobutton group gr1,
+            p_select radiobutton group gr1.
+selection-screen end of block b01.
+
+start-of-selection.
+  if p_insert = 'X'.
+    perform f_insert.
+
+  elseif p_update = 'X'.
+    perform f_update.
+
+  elseif p_modify = 'X'.
+    perform f_modify.
+
+  elseif p_delete = 'X'.
+    perform f_delete.
+
+  elseif p_select = 'X'.
+    perform f_select.
+
+  endif.
+
+form f_insert.
+  clear zt001.
+  zt001-tpmat = p_tpmat.
+  zt001-denom = p_denom.
+  insert zt001.
+  if sy-subrc = 0.
+    commit work.
+    message 'Registrado com sucesso.' type 'S'.
+  else.
+    rollback work.
+    message 'Erro ao registrar.' type 'I'.
+  endif.
+endform.
+
+form f_update.
+  update zt001
+   set denom = p_denom
+  where tpmat = p_tpmat.
+  if sy-subrc = 0.
+    commit work.
+    message 'Atualizado com sucesso.' type 'S'.
+  else.
+    rollback work.
+    message 'Erro ao atualizar.' type 'I'.
+  endif.
+endform.
+
+form f_modify.
+  clear zt001.
+  zt001-tpmat = p_tpmat.
+  zt001-denom = p_denom.
+  modify zt001.
+  if sy-subrc = 0.
+    commit work.
+    message 'Registrado/Atualizado com sucesso.' type 'S'.
+  else.
+    rollback work.
+    message 'Erro ao inserir/atualizar o registro.' type 'I'.
+  endif.
+endform.
+
+form f_delete.
+  delete from zt001 where tpmat = p_tpmat.
+  if sy-subrc = 0.
+    commit work.
+    message 'Deletado com sucesso..' type 'S'.
+  else.
+    rollback work.
+    message 'Erro ao deletar o registro.' type 'I'.
+  endif.
+endform.
+
+form f_select.
+  select * from zt001 into table t_zt001 where tpmat = p_tpmat.
+
+  loop at t_zt001 into wa_zt001.
+    write:/01 '|',
+           02 wa_zt001-tpmat,
+           07 '|',
+           08 wa_zt001-denom,
+           30 '|'.
+    uline /(30).
+  endloop.
+endform.

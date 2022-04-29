@@ -1,0 +1,32 @@
+*&---------------------------------------------------------------------*
+*& Report ZR00016
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+report zr00016.
+
+* declarando tabelas transparentes.
+tables t005t. " Country Names
+
+* Tela de selecao
+parameters p_spras like t005t-spras default 'EN'.
+
+uline (30).
+
+write:/01'|',
+       02 'Pais',
+       07'|',
+       08'Denominação',
+       30'|'.
+
+uline /(30).
+
+* funciona que nem um loop. --> muito ruim para performance. (nao usar ou para poucas informacoes)
+select * from t005t where spras = p_spras.
+write:/01 '|',
+       02 t005t-land1,
+       07 '|',
+       08 t005t-landx,
+       30 '|'.
+uline /(30).
+endselect.

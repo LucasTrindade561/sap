@@ -1,0 +1,86 @@
+*&---------------------------------------------------------------------*
+*& Report ZR00018
+*&---------------------------------------------------------------------*
+*& Relatorio de Regiões.
+*&---------------------------------------------------------------------*
+report zr00018.
+
+* tabela transparente
+tables t005u.
+
+* work area
+data: begin of wa_t005u occurs 0,
+        land1 like t005u-land1,
+        bland like t005u-bland,
+        bezei like t005u-bezei,
+      end of wa_t005u.
+
+* tabela interna
+data: begin of t_t005u occurs 0,
+        land1 like t005u-land1,
+        bland like t005u-bland,
+        bezei like t005u-bezei,
+      end of t_t005u.
+
+* selection-options --> for
+* Tela de seleção
+selection-screen begin of block b01 with frame title text-001.
+select-options: s_land1 for t005u-land1,
+                s_bland for t005u-bland.
+selection-screen end of block b01.
+
+selection-screen begin of block b02 with frame title text-002.
+parameters: p_spras like t005u-spras.
+selection-screen end of block b02.
+
+initialization.
+  s_land1-low = 'BR'.
+  s_land1-sign = 'I'.
+  s_land1-option = 'EQ'.
+  p_spras = 'EN'.
+  append s_land1. clear s_land1.
+
+top-of-page.
+  perform f_imprime_cabecalho.
+
+* Rotina de seleção --> aqui nao botamos o ponteiro(wa), pq aqui estamos apenas selecionando, usamos apenas o wa quando queremos pegar um registro de uma tabela.
+start-of-selection.
+  perform f_seleciona_dados.
+
+  perform f_imprime_dados.
+
+form f_seleciona_dados.
+  select land1 bland bezei
+  from t005u
+  into table t_t005u
+ where land1 in s_land1 " select option nao pode '=' sempre in
+   and bland in s_bland
+   and spras = p_spras. " aqui pode normal pois é um parameters
+endform.
+
+form f_imprime_cabecalho.
+  format color 1.
+  uline /(35).
+  write: /1'|',
+         2 'Pais',
+         7 '|',
+         8 'Região',
+         14 '|',
+         15 'Denominação',
+         35, '|'.
+  uline /(35).
+  format reset.
+endform.
+
+form f_imprime_dados.
+  loop at t_t005u into wa_t005u.
+    write: /1 '|',
+           2 wa_t005u-land1,
+           7 '|',
+           8 wa_t005u-bland,
+           14 '|',
+           15 wa_t005u-bezei,
+           35, '|'.
+    uline /(35).
+  endloop.
+endform.

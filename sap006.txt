@@ -1,0 +1,32 @@
+*&---------------------------------------------------------------------*
+*& Report ZR00011
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT ZR00011.
+
+data: v_final type p decimals 2,
+      v_des type p decimals 2,
+      v_dec_acres type p decimals 2.
+
+parameters: p_vtotal type p decimals 2,
+            p_qtd type i.
+
+if p_vtotal <= '100' and p_qtd = 1.
+   v_des = '-15'.
+elseif p_vtotal > '100' and p_qtd = 1.
+   v_des = '-20'.
+elseif p_vtotal <= '100' and p_qtd <= 3.
+   v_des = '-5'.
+elseif p_vtotal > '100' and p_qtd <= 3.
+   v_des = '-10'.
+endif.
+
+v_dec_acres = ( p_vtotal / 100 ) * v_des.
+v_final = p_vtotal + v_dec_acres.
+
+write:/ 'Valor original =', p_vtotal,
+      / 'Qtd.parcela(s) =', p_qtd,
+      / 'Percentual Desconto/Acrescimo =', v_des,
+      / 'Valor desconto/acrescimo =', v_dec_acres,
+      / 'Valor final =', v_final.

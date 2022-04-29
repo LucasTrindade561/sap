@@ -1,0 +1,350 @@
+*&---------------------------------------------------------------------*
+*& Report ZR00032
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+report zr00032.
+
+* tabela transparente
+tables: zt005.
+
+* tabelas internas
+data: t_zt005    type table of zt005,
+      t_zt001    type table of zt001,
+      t_saida    type table of zs0001,
+      t_fieldcat type slis_t_fieldcat_alv,  " grupo de tipos para alv, usado para tabela intera.
+      t_sort     type slis_t_sortinfo_alv,
+      t_header   type slis_t_listheader.
+
+* work area
+data: wa_zt005    type zt005,
+      wa_zt001    type zt001,
+      wa_saida    type zs0001,
+      wa_fieldcat type slis_fieldcat_alv,  " slis_t_fieldcat_alv referencia slis_fieldcat_alv
+      wa_sort     type slis_sortinfo_alv,
+      wa_layout   type slis_layout_alv,
+      wa_header   type slis_listheader,
+      wa_variant  type disvariant.
+
+* tela de selecao
+selection-screen begin of block bc001 with frame title text-001.
+select-options: s_tpmat for zt005-tpmat,
+                s_mater for zt005-mater.
+selection-screen end of block bc001.
+
+selection-screen begin of block bc002 with frame title text-002.
+parameters: p_varian type slis_vari. " gravar variante no relatorio alv
+selection-screen end of block bc002.
+
+at selection-screen on value-request for p_varian.
+* changing é utilizado para passar parametros dentro do perform.
+* Sua diferença é que ele pode mudar diferente do using que nao pode.
+  perform f_variant_f4 changing p_varian.
+
+start-of-selection.
+  perform f_seleciona_dados.
+
+  perform f_monta_tabela_saida.
+
+  perform f_monta_alv.
+
+form f_seleciona_dados.
+  select * from zt005 into table t_zt005
+    where tpmat in s_tpmat
+      and mater in s_mater.
+
+  if sy-subrc is initial.
+    select * from zt001 into table t_zt001
+      for all entries in t_zt005
+      where tpmat = t_zt005-tpmat.
+  else.
+    message text-003 type 'I'. " Não foi encontrado nenhum registro com esses parâmetros.
+    stop.
+  endif.
+endform.
+
+form f_monta_tabela_saida.
+  loop at t_zt005 into wa_zt005.
+
+    clear wa_saida.
+    wa_saida-mater = wa_zt005-mater.
+    wa_saida-denom = wa_zt005-denom.
+    wa_saida-brgew = wa_zt005-brgew.
+    wa_saida-ntgew = wa_zt005-ntgew.
+    wa_saida-gewei = wa_zt005-gewei .
+    wa_saida-status = wa_zt005-status.
+    wa_saida-tpmat = wa_zt005-tpmat.
+
+*   Quando é um para um, podemos utilizar o read table.
+    read table t_zt001 into wa_zt001 with key tpmat = wa_zt005-tpmat.
+    if sy-subrc is initial.
+      wa_saida-denom_tp = wa_zt001-denom.
+    endif.
+
+    append wa_saida to t_saida.
+  endloop.
+endform.
+
+form f_monta_alv.
+  perform f_define_fieldcat.
+
+  perform f_ordena.
+
+  perform f_layout.
+
+  perform f_imprime_alv.
+endform.
+
+form f_define_fieldcat.
+* Aqui definimos as caracteristicas de cada uma das colunas.
+
+  call function 'REUSE_ALV_FIELDCATALOG_MERGE'
+    exporting
+      i_program_name         = sy-repid
+      i_internal_tabname     = 'T_SAIDA'
+      i_structure_name       = 'ZS0001' " aonde vai buscar as caracteristicas
+*     I_CLIENT_NEVER_DISPLAY = 'X'
+*     I_INCLNAME             =
+*     I_BYPASSING_BUFFER     =
+*     I_BUFFER_ACTIVE        =
+    changing
+      ct_fieldcat            = t_fieldcat
+    exceptions
+      inconsistent_interface = 1
+      program_error          = 2
+      others                 = 3.
+
+  if sy-subrc <> 0.
+    message text-006 type 'I'. " Erro na definição da fieldcat.
+    stop.
+  else.
+    loop at t_fieldcat into wa_fieldcat.
+      case wa_fieldcat-fieldname.
+        when 'BRGEW'.
+          wa_fieldcat-seltext_s = wa_fieldcat-seltext_m = wa_fieldcat-seltext_l = wa_fieldcat-reptext_ddic = text-004.
+
+        when 'NTGEW'.
+          wa_fieldcat-seltext_s = wa_fieldcat-seltext_m = wa_fieldcat-seltext_l = wa_fieldcat-reptext_ddic = text-005.
+
+        when 'GEWEI'.
+          wa_fieldcat-seltext_s = wa_fieldcat-seltext_m = wa_fieldcat-seltext_l = wa_fieldcat-reptext_ddic = text-007.
+
+        when 'MATER'.
+          wa_fieldcat-hotspot = 'X'.
+
+        when 'DENOM'.
+          wa_fieldcat-edit = 'X'.
+      endcase.
+
+*     controla o index que esta sendo lido entro do loop e com isso atualiza os campos que queremos atualizar.
+*     fica mais rapida
+      modify t_fieldcat from wa_fieldcat index sy-tabix transporting seltext_s seltext_m seltext_l reptext_ddic hotspot edit.
+
+    endloop.
+
+  endif.
+
+endform.
+
+form f_ordena.
+* Definimos a sequencia de ordenacao
+  clear wa_sort.
+  wa_sort-spos = 1.
+  wa_sort-fieldname = 'MATER'.
+  wa_sort-tabname =   'T_SAIDA'.
+  wa_sort-up = 'X'.
+  append wa_sort to t_sort.
+endform.
+
+form f_layout.
+
+  wa_layout-zebra = 'X'.
+  wa_layout-colwidth_optimize = 'X'.
+
+endform.
+
+form f_imprime_alv.
+
+* Aqui estamos passando a variante que foi selecionada dentro do layout.
+  wa_variant-variant = p_varian.
+
+  call function 'REUSE_ALV_GRID_DISPLAY'
+    exporting
+*     I_INTERFACE_CHECK       = ' '
+*     I_BYPASSING_BUFFER      = ' '
+*     I_BUFFER_ACTIVE         = ' '
+      i_callback_program      = sy-repid
+*     I_CALLBACK_PF_STATUS_SET          = ' '
+      i_callback_user_command = 'USER_COMMAND'
+      i_callback_top_of_page  = 'F_CABECALHO'
+*     I_CALLBACK_HTML_TOP_OF_PAGE       = ' '
+*     I_CALLBACK_HTML_END_OF_LIST       = ' '
+*     I_STRUCTURE_NAME        =
+*     I_BACKGROUND_ID         = ' '
+*     I_GRID_TITLE            =
+*     I_GRID_SETTINGS         =
+      is_layout               = wa_layout
+      it_fieldcat             = t_fieldcat
+*     IT_EXCLUDING            =
+*     IT_SPECIAL_GROUPS       =
+      it_sort                 = t_sort
+*     IT_FILTER               =
+*     IS_SEL_HIDE             =
+*     I_DEFAULT               = 'X'
+      i_save                  = 'X'
+      is_variant              = wa_variant
+*     IT_EVENTS               =
+*     IT_EVENT_EXIT           =
+*     IS_PRINT                =
+*     IS_REPREP_ID            =
+*     I_SCREEN_START_COLUMN   = 0
+*     I_SCREEN_START_LINE     = 0
+*     I_SCREEN_END_COLUMN     = 0
+*     I_SCREEN_END_LINE       = 0
+*     I_HTML_HEIGHT_TOP       = 0
+*     I_HTML_HEIGHT_END       = 0
+*     IT_ALV_GRAPHICS         =
+*     IT_HYPERLINK            =
+*     IT_ADD_FIELDCAT         =
+*     IT_EXCEPT_QINFO         =
+*     IR_SALV_FULLSCREEN_ADAPTER        =
+*   IMPORTING
+*     E_EXIT_CAUSED_BY_CALLER =
+*     ES_EXIT_CAUSED_BY_USER  =
+    tables
+      t_outtab                = t_saida " tabela aonde tem as informcaoes que queremos que seja exibida.
+    exceptions
+      program_error           = 1
+      others                  = 2.
+  if sy-subrc <> 0.
+* Implement suitable error handling here
+  endif.
+
+endform.
+
+form f_cabecalho.
+
+  clear wa_header.
+  refresh t_header.
+
+  wa_header-typ  = 'H'. " é o tipo de texto dentro do cabecalho.
+  wa_header-info = text-008. " Relatorio de Materiais
+  append wa_header to t_header.
+
+  wa_header-typ = 'S'.
+  wa_header-key = text-009. " Data:
+  write sy-datum to wa_header-info. " com o write, ele formata certinho.
+  append wa_header to t_header.
+
+  wa_header-typ = 'S'.
+  wa_header-key = text-010. " Hora:
+  write sy-uzeit to wa_header-info. " com o write, ele formata certinho.
+  append wa_header to t_header.
+
+  call function 'REUSE_ALV_COMMENTARY_WRITE'
+    exporting
+      it_list_commentary = t_header
+      i_logo             = 'ENJOYSAP_LOGO'
+*     I_END_OF_LIST_GRID =
+*     I_ALV_FORM         =
+    .
+endform.
+
+* changing é usado para quando temos parametros e ele pode ser modificado no meio do form.
+form f_variant_f4 changing p_p_varian.
+
+* criando uma rotina para acessar as variantes que foram criadas e estão vinculadas a esse relatorio.
+  data: vl_variant type disvariant.
+  vl_variant-report = sy-repid.
+
+  call function 'REUSE_ALV_VARIANT_F4'
+    exporting
+      is_variant    = vl_variant
+*     I_TABNAME_HEADER          =
+*     I_TABNAME_ITEM            =
+*     IT_DEFAULT_FIELDCAT       =
+      i_save        = 'A'
+*     I_DISPLAY_VIA_GRID        = ' '
+    importing
+*     e_exit        =
+      es_variant    = vl_variant
+    exceptions
+      not_found     = 1
+      program_error = 2
+      others        = 3.
+
+  if sy-subrc = 0.
+    p_p_varian = vl_variant-variant. " aqui mudamos a tela de selecao.
+  endif.
+
+endform.
+
+* Chamar uma manuntencao de tabela para um determinado campo que cliclamos dentro do alv.
+form user_command using r_ucomm like sy-ucomm " botao que foi clicado
+                        rs_selfield type slis_selfield. " informacoes do campo que ele clicou
+
+  data: tl_vimsellist type standard table of vimsellist,
+        wl_vimsellist type vimsellist.
+
+  if rs_selfield-sel_tab_field = 'T_SAIDA-MATER'.
+
+    wl_vimsellist-viewfield = 'MATER'.
+    wl_vimsellist-operator  = 'EQ'.
+    wl_vimsellist-value     = rs_selfield-value.
+    append wl_vimsellist to tl_vimsellist.
+
+    call function 'VIEW_MAINTENANCE_CALL'
+      exporting
+        action                       = 'S'
+*       CORR_NUMBER                  = '          '
+*       GENERATE_MAINT_TOOL_IF_MISSING       = ' '
+*       SHOW_SELECTION_POPUP         = ' '
+        view_name                    = 'ZT005' " tabela aonde esta o campo
+*       NO_WARNING_FOR_CLIENTINDEP   = ' '
+*       RFC_DESTINATION_FOR_UPGRADE  = ' '
+*       CLIENT_FOR_UPGRADE           = ' '
+*       VARIANT_FOR_SELECTION        = ' '
+*       COMPLEX_SELCONDS_USED        = ' '
+*       CHECK_DDIC_MAINFLAG          = ' '
+*       SUPPRESS_WA_POPUP            = ' '
+      tables
+        dba_sellist                  = tl_vimsellist " determinar os campos da selecao
+*       EXCL_CUA_FUNCT               =
+      exceptions
+        client_reference             = 1
+        foreign_lock                 = 2
+        invalid_action               = 3
+        no_clientindependent_auth    = 4
+        no_database_function         = 5
+        no_editor_function           = 6
+        no_show_auth                 = 7
+        no_tvdir_entry               = 8
+        no_upd_auth                  = 9
+        only_show_allowed            = 10
+        system_failure               = 11
+        unknown_field_in_dba_sellist = 12
+        view_not_found               = 13
+        maintenance_prohibited       = 14
+        others                       = 15.
+
+    if sy-subrc <> 0.
+* Implement suitable error handling here
+    endif.
+
+  elseif r_ucomm = '&DATA_SAVE'.
+    loop at t_saida into wa_saida.
+
+      read table t_zt005 into wa_zt005 with key mater = wa_saida-mater.
+      if sy-subrc is initial.
+*        wa_zt005-denom = wa_saida-denom.
+        update zt005 set denom = wa_saida-denom where mater = wa_saida-mater.
+        if sy-subrc = 0.
+          commit work.
+        endif.
+      endif.
+
+    endloop.
+
+  endif.
+
+endform.

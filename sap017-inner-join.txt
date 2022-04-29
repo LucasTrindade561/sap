@@ -1,0 +1,75 @@
+*&---------------------------------------------------------------------*
+*& Report ZR00022
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+report zr00022.
+
+* tabela transparentes
+tables zt005.
+
+* tipos --> a tipagem das coisas que recuperamos do inner join
+types: begin of ty_mater,
+         mater  like zt005-mater,
+         denom  like zt005-denom,
+         brgew  like zt005-brgew,
+         ntgew  like zt005-ntgew,
+         gewei  like zt005-gewei,
+         status like zt005-status,
+         tpmat  like zt001-tpmat,
+         denom1 like zt001-denom,
+       end of ty_mater.
+
+* tabelas internas
+data: t_mater type table of ty_mater.
+
+* work area
+data wa_mater type ty_mater.
+
+* Tela de selecao
+selection-screen begin of block b01 with frame title text-001.
+select-options: s_tpmat for zt005-tpmat,
+                s_mater for zt005-mater.
+selection-screen end of block b01.
+
+* inicio do processamento
+start-of-selection.
+  perform f_seleciona_dados.
+
+  perform f_imprime_dados.
+
+form f_seleciona_dados.
+
+  select zt005~mater zt005~denom zt005~brgew zt005~ntgew zt005~gewei zt005~status
+          zt001~tpmat zt001~denom
+    from zt005
+   inner join zt001
+    on zt005~tpmat = zt001~tpmat
+   into table t_mater
+  where zt005~tpmat in s_tpmat
+   and zt005~mater in s_mater.
+
+  if sy-subrc <> 0.
+    message text-002 type 'I'. " Erro ao selecionar.
+    stop.
+  endif.
+
+endform.
+
+form f_imprime_dados.
+  loop at t_mater into wa_mater.
+    write:/ wa_mater-mater,
+            wa_mater-denom,
+            wa_mater-brgew,
+            wa_mater-ntgew,
+            wa_mater-gewei,
+            wa_mater-status,
+            wa_mater-tpmat,
+            wa_mater-denom1.
+  endloop.
+
+  if sy-subrc <> 0.
+    message text-003 type 'I'.
+    stop.
+  endif.
+endform.

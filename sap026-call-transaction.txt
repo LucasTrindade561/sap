@@ -1,0 +1,224 @@
+*&---------------------------------------------------------------------*
+*& Report ZR00027
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+report zr00029.
+
+* tabela transparente
+tables zt004.
+
+* tipos
+types: begin of ty_file,
+         forne like zt004-forne,
+         denom like zt004-denom,
+         ender like zt004-ender,
+         telef like zt004-telef,
+         email like zt004-email,
+         cnpj  like zt004-cnpj,
+       end of ty_file.
+
+* tabelas interna
+data: t_file type standard table of ty_file.
+data: t_bdcdata type standard table of bdcdata.
+data: t_message type standard table of bdcmsgcoll.
+
+* work area
+data: wa_file type ty_file.
+data: wa_bdcdata type bdcdata.
+data: wa_message type bdcmsgcoll.
+
+* tela de selecao
+parameters: p_file type localfile,
+            p_mode type c default 'A'. " n so se acontecer um erro
+
+at selection-screen on value-request for p_file.
+  perform f_seleciona_arquivo.
+
+start-of-selection.
+  perform f_upload_file.
+  perform f_montar_bdc. " implementar o mapeamento.
+
+
+form f_seleciona_arquivo.
+  call function 'KD_GET_FILENAME_ON_F4'
+    exporting
+*     PROGRAM_NAME        = SYST-REPID
+*     DYNPRO_NUMBER       = SYST-DYNNR
+      field_name = p_file
+*     STATIC     = ' '
+*     MASK       = ' '
+*     FILEOPERATION       = 'R'
+*     PATH       =
+    changing
+      file_name  = p_file
+*     LOCATION_FLAG       = 'P'
+*   EXCEPTIONS
+*     MASK_TOO_LONG       = 1
+*     OTHERS     = 2
+    .
+  if sy-subrc <> 0.
+* Implement suitable error handling here
+  endif.
+
+endform.
+
+form f_upload_file.
+  data: vl_filename type string.
+  vl_filename = p_file.
+
+  call function 'GUI_UPLOAD'
+    exporting
+      filename                = vl_filename
+      filetype                = 'ASC'
+*     HAS_FIELD_SEPARATOR     = ' '
+*     HEADER_LENGTH           = 0
+*     READ_BY_LINE            = 'X'
+*     DAT_MODE                = ' '
+*     CODEPAGE                = ' '
+*     IGNORE_CERR             = ABAP_TRUE
+*     REPLACEMENT             = '#'
+*     CHECK_BOM               = ' '
+*     VIRUS_SCAN_PROFILE      =
+*     NO_AUTH_CHECK           = ' '
+* IMPORTING
+*     FILELENGTH              =
+*     HEADER                  =
+    tables
+      data_tab                = t_file
+* CHANGING
+*     ISSCANPERFORMED         = ' '
+    exceptions
+      file_open_error         = 1
+      file_read_error         = 2
+      no_batch                = 3
+      gui_refuse_filetransfer = 4
+      invalid_type            = 5
+      no_authority            = 6
+      unknown_error           = 7
+      bad_data_format         = 8
+      header_not_allowed      = 9
+      separator_not_allowed   = 10
+      header_too_long         = 11
+      unknown_dp_error        = 12
+      access_denied           = 13
+      dp_out_of_memory        = 14
+      disk_full               = 15
+      dp_timeout              = 16
+      others                  = 17.
+  if sy-subrc <> 0.
+    message text-001 type 'I'. " erro ao fazer upload do arquivo
+  endif.
+
+endform.
+
+form f_montar_bdc.
+
+  loop at t_file into wa_file. " passando os dados do wa para a tabela interna.
+
+    " passando o nome do programa e o numero da tela.
+    perform f_monta_tela using 'SAPLZTABELAS' '0004'.
+    perform f_monta_dados using 'BDC_CURSOR' 'ZT004-DENOM(01)'.
+    perform f_monta_dados using 'BDC_OKCODE' '=NEWL'.
+
+    " /00 --> ISSO AQUI NAO PODE ESTAR AQUI.
+    perform f_monta_tela using 'SAPLZTABELAS' '0005'.
+    perform f_monta_dados using 'BDC_CURSOR' 'ZT004-CNPJ'.
+    perform f_monta_dados using 'BDC_OKCODE' '/00'.
+    perform f_monta_dados using 'ZT004-FORNE' wa_file-forne.
+    perform f_monta_dados using 'ZT004-DENOM' wa_file-denom.
+    perform f_monta_dados using 'ZT004-ENDER' wa_file-ender.
+    perform f_monta_dados using 'ZT004-TELEF' wa_file-telef.
+    perform f_monta_dados using 'ZT004-EMAIL' wa_file-email.
+    perform f_monta_dados using 'ZT004-CNPJ' wa_file-cnpj.
+
+    " save
+    perform f_monta_tela using 'SAPLZTABELAS' '0005'.
+    perform f_monta_dados using 'BDC_CURSOR' 'ZT004-FORNE'.
+    perform f_monta_dados using 'BDC_OKCODE' '=SAVE'.
+    perform f_monta_dados using 'ZT004-FORNE' wa_file-forne.
+    perform f_monta_dados using 'ZT004-DENOM' wa_file-denom.
+    perform f_monta_dados using 'ZT004-ENDER' wa_file-ender.
+    perform f_monta_dados using 'ZT004-TELEF' wa_file-telef.
+    perform f_monta_dados using 'ZT004-EMAIL' wa_file-email.
+    perform f_monta_dados using 'ZT004-CNPJ' wa_file-cnpj.
+
+    " ende
+    perform f_monta_tela using 'SAPLZTABELAS' '0005'.
+    perform f_monta_dados using 'BDC_CURSOR' 'ZT004-FORNE'.
+    perform f_monta_dados using 'BDC_OKCODE' '=ENDE'.
+
+    call transaction 'ZCAD004'
+      using t_bdcdata
+      mode p_mode
+      update 'A'
+     messages into t_message.
+
+    perform f_imprime_mensagem.
+
+  endloop.
+
+endform.
+
+form f_monta_tela using p_program
+                        p_screen.
+
+* Isso é referente ao mapeamento que fizemos shdb
+  clear wa_bdcdata.
+  wa_bdcdata-program = p_program.
+  wa_bdcdata-dynpro = p_screen.
+  wa_bdcdata-dynbegin = 'X'.
+  append wa_bdcdata to t_bdcdata.
+
+endform.
+
+form f_monta_dados using p_name
+                        p_value.
+* Isso é referente ao mapeamento que fizemos shdb
+  clear wa_bdcdata.
+  wa_bdcdata-fnam = p_name.
+  wa_bdcdata-fval = p_value.
+  append wa_bdcdata to t_bdcdata.
+
+endform.
+
+form f_imprime_mensagem.
+  data: vl_id      type bapiret2-id,
+        vl_number  type bapiret2-number,
+        vl_mess1   type bapiret2-message_v1,
+        vl_mess2   type bapiret2-message_v2,
+        vl_mess3   type bapiret2-message_v3,
+        vl_mess4   type bapiret2-message_v4,
+        vl_message type bapiret2-message.
+
+  loop at t_message into wa_message where msgtyp = 'E' or msgtyp = 'S'.
+    vl_id = wa_message-msgid.
+    vl_number = wa_message-msgnr.
+    vl_mess1 = wa_message-msgv1.
+    vl_mess2 = wa_message-msgv2.
+    vl_mess3 = wa_message-msgv3.
+    vl_mess4 = wa_message-msgv4.
+    call function 'BAPI_MESSAGE_GETDETAIL'
+      exporting
+        id         = vl_id
+        number     = vl_number
+*       LANGUAGE   = SY-LANGU
+        textformat = 'ASC'
+*       LINKPATTERN        =
+        message_v1 = vl_mess1
+        message_v2 = vl_mess2
+        message_v3 = vl_mess3
+        message_v4 = vl_mess4
+*       LANGUAGE_ISO       =
+*       LINE_SIZE  =
+      importing
+        message    = vl_message.
+*       RETURN     =
+*   TABLES
+*       TEXT       =
+
+    write:/ vl_message..
+  endloop.
+
+  clear: t_bdcdata, wa_bdcdata, t_message.
+endform.

@@ -1,0 +1,57 @@
+*&---------------------------------------------------------------------*
+*& Report ZR00021
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+report zr00021.
+
+" declarando variavel
+data: v_result type i.
+
+* Tela de selecao
+parameters: p_num1 type i,
+            p_num2 type i,
+            p_oper type c.
+
+" inicio do processamento.
+
+start-of-selection.
+  perform f_executa_calculo.
+
+  perform f_imprime_resultado.
+
+form f_executa_calculo.
+
+  call function 'Z_F0001'
+    exporting
+      numero1      = p_num1
+      numero2      = p_num2
+      operacao     = p_oper
+    importing
+      resultado    = v_result
+    exceptions
+      inv_operador = 1
+      div_zero     = 2
+      others       = 3.
+
+  if sy-subrc <> 0.
+
+    if sy-subrc = 1.
+      message text-001 type 'I'. " Operador invalido
+      stop.
+    elseif sy-subrc = 2.
+      message text-002 type 'I'. " Divisao por zero
+      stop.
+    else.
+      message text-003 type 'I'. " Erro inesperado
+      stop.
+    endif.
+
+  endif.
+
+
+endform.
+
+form f_imprime_resultado.
+  write: text-004, v_result. " resultado
+endform.

@@ -1,0 +1,59 @@
+*&---------------------------------------------------------------------*
+*& Report ZR00024
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+report zr00024.
+
+* Tabelas transparentes
+tables zt005.
+
+* tabelas internas
+data: t_zt001 type table of zt001 with header line,
+      t_zt005 type table of zt005 with header line.
+
+* tela de selecao
+select-options: s_tpmat for zt005-tpmat,
+                s_mater for zt005-mater.
+
+start-of-selection.
+  perform f_seleciona_dados.
+
+  perform f_imprime_dados.
+
+
+form f_seleciona_dados.
+
+  select * from zt005 into table t_zt005
+    where mater in s_mater
+      and tpmat in s_tpmat.
+
+  " utilizando as informacoes encontrada no primeiro select para encontrar as novas informacoes.
+  " ou seja, esta usando como criteiro (tpmat) do zt005 para encontrar as outras informacoes do zt001.
+  " basicamente ta usando o tpmat do zt005 para achar a denom do zt001.
+  if t_zt005[] is not initial. " is initial --> = 0, is not initial --> <> 0
+    select * from zt001 into table t_zt001
+      for all entries in t_zt005
+        where tpmat = t_zt005-tpmat.
+  else.
+    message text-001 type 'I'. " Nenhum registro encontrado.
+    stop.
+  endif.
+endform.
+
+form f_imprime_dados.
+  " ordenando as tabelas por determinado campo.
+  sort t_zt005 by mater tpmat.
+  sort t_zt001 by tpmat.
+
+  loop at t_zt005.
+    write:/ t_zt005-mater, t_zt005-denom, t_zt005-brgew, t_zt005-ntgew, t_zt005-tpmat.
+
+    " utilizamos o read table pq isso é um para um.
+    read table t_zt001 with key tpmat = t_zt005-tpmat binary search.
+    if sy-subrc is initial.
+      write: t_zt001-denom.
+    endif.
+
+  endloop.
+endform.

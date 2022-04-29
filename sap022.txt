@@ -1,0 +1,249 @@
+*&---------------------------------------------------------------------*
+*& Report ZR00027
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+report zr00027.
+
+* tabela transparente
+tables zt004.
+
+* tipos
+types: begin of ty_file,
+         forne like zt004-forne,
+         denom like zt004-denom,
+         ender like zt004-ender,
+         telef like zt004-telef,
+         email like zt004-email,
+         cnpj  like zt004-cnpj,
+       end of ty_file.
+
+* tabelas interna
+data: t_file type standard table of ty_file.
+data: t_bdcdata type standard table of bdcdata.
+
+* work area
+data: wa_file type ty_file.
+data: wa_bdcdata type bdcdata.
+
+* tela de selecao
+parameters:   p_file type localfile.
+
+at selection-screen on value-request for p_file.
+  perform f_seleciona_arquivo.
+
+start-of-selection.
+  perform f_upload_file.
+  perform f_montar_bdc. " implementar o mapeamento.
+
+
+form f_seleciona_arquivo.
+  call function 'KD_GET_FILENAME_ON_F4'
+    exporting
+*     PROGRAM_NAME        = SYST-REPID
+*     DYNPRO_NUMBER       = SYST-DYNNR
+      field_name = p_file
+*     STATIC     = ' '
+*     MASK       = ' '
+*     FILEOPERATION       = 'R'
+*     PATH       =
+    changing
+      file_name  = p_file
+*     LOCATION_FLAG       = 'P'
+*   EXCEPTIONS
+*     MASK_TOO_LONG       = 1
+*     OTHERS     = 2
+    .
+  if sy-subrc <> 0.
+* Implement suitable error handling here
+  endif.
+
+endform.
+
+form f_upload_file.
+  data: vl_filename type string.
+  vl_filename = p_file.
+
+  call function 'GUI_UPLOAD'
+    exporting
+      filename                = vl_filename
+      filetype                = 'ASC'
+*     HAS_FIELD_SEPARATOR     = ' '
+*     HEADER_LENGTH           = 0
+*     READ_BY_LINE            = 'X'
+*     DAT_MODE                = ' '
+*     CODEPAGE                = ' '
+*     IGNORE_CERR             = ABAP_TRUE
+*     REPLACEMENT             = '#'
+*     CHECK_BOM               = ' '
+*     VIRUS_SCAN_PROFILE      =
+*     NO_AUTH_CHECK           = ' '
+* IMPORTING
+*     FILELENGTH              =
+*     HEADER                  =
+    tables
+      data_tab                = t_file
+* CHANGING
+*     ISSCANPERFORMED         = ' '
+    exceptions
+      file_open_error         = 1
+      file_read_error         = 2
+      no_batch                = 3
+      gui_refuse_filetransfer = 4
+      invalid_type            = 5
+      no_authority            = 6
+      unknown_error           = 7
+      bad_data_format         = 8
+      header_not_allowed      = 9
+      separator_not_allowed   = 10
+      header_too_long         = 11
+      unknown_dp_error        = 12
+      access_denied           = 13
+      dp_out_of_memory        = 14
+      disk_full               = 15
+      dp_timeout              = 16
+      others                  = 17.
+  if sy-subrc <> 0.
+    message text-001 type 'I'. " erro ao fazer upload do arquivo
+  endif.
+
+endform.
+
+form f_montar_bdc.
+
+  perform f_abre_pasta. " abrindo a pasta do batch e adicionando esses dados dentro da pasta batch.
+
+  loop at t_file into wa_file. " passando os dados do wa para a tabela interna.
+
+    " passando o nome do programa e o numero da tela.
+    perform f_monta_tela using 'SAPLZTABELAS' '0004'.
+    perform f_monta_dados using 'BDC_CURSOR' 'ZT004-DENOM(01)'.
+    perform f_monta_dados using 'BDC_OKCODE' '=NEWL'.
+
+    " /00 --> ISSO AQUI NAO PODE ESTAR AQUI.
+    perform f_monta_tela using 'SAPLZTABELAS' '0005'.
+    perform f_monta_dados using 'BDC_CURSOR' 'ZT004-CNPJ'.
+    perform f_monta_dados using 'BDC_OKCODE' '/00'.
+    perform f_monta_dados using 'ZT004-FORNE' wa_file-forne.
+    perform f_monta_dados using 'ZT004-DENOM' wa_file-denom.
+    perform f_monta_dados using 'ZT004-ENDER' wa_file-ender.
+    perform f_monta_dados using 'ZT004-TELEF' wa_file-telef.
+    perform f_monta_dados using 'ZT004-EMAIL' wa_file-email.
+    perform f_monta_dados using 'ZT004-CNPJ' wa_file-cnpj.
+
+    " save
+    perform f_monta_tela using 'SAPLZTABELAS' '0005'.
+    perform f_monta_dados using 'BDC_CURSOR' 'ZT004-FORNE'.
+    perform f_monta_dados using 'BDC_OKCODE' '=SAVE'.
+    perform f_monta_dados using 'ZT004-FORNE' wa_file-forne.
+    perform f_monta_dados using 'ZT004-DENOM' wa_file-denom.
+    perform f_monta_dados using 'ZT004-ENDER' wa_file-ender.
+    perform f_monta_dados using 'ZT004-TELEF' wa_file-telef.
+    perform f_monta_dados using 'ZT004-EMAIL' wa_file-email.
+    perform f_monta_dados using 'ZT004-CNPJ' wa_file-cnpj.
+
+    " ende
+    perform f_monta_tela using 'SAPLZTABELAS' '0005'.
+    perform f_monta_dados using 'BDC_CURSOR' 'ZT004-FORNE'.
+    perform f_monta_dados using 'BDC_OKCODE' '=ENDE'.
+
+    perform f_inseri_bdc. " informa a transação que estamos executando (zd004, poderia ser outra).
+  endloop.
+
+  perform f_fecha_pasta. " fechando a pasta batch
+
+endform.
+
+form f_monta_tela using p_program
+                        p_screen.
+
+* Isso é referente ao mapeamento que fizemos shdb
+  clear wa_bdcdata.
+  wa_bdcdata-program = p_program.
+  wa_bdcdata-dynpro = p_screen.
+  wa_bdcdata-dynbegin = 'X'.
+  append wa_bdcdata to t_bdcdata.
+
+endform.
+
+form f_monta_dados using p_name
+                        p_value.
+* Isso é referente ao mapeamento que fizemos shdb
+  clear wa_bdcdata.
+  wa_bdcdata-fnam = p_name.
+  wa_bdcdata-fval = p_value.
+  append wa_bdcdata to t_bdcdata.
+
+endform.
+
+form f_abre_pasta.
+  call function 'BDC_OPEN_GROUP'
+    exporting
+      client              = sy-mandt
+*     DEST                = FILLER8
+      group               = 'carga_fornec'
+*     HOLDDATE            = FILLER8
+      keep                = 'X'
+      user                = sy-uname
+*     RECORD              = FILLER1
+*     PROG                = SY-CPROG
+*     DCPFM               = '%'
+*     DATFM               = '%'
+*   IMPORTING
+*     QID                 =
+    exceptions
+      client_invalid      = 1
+      destination_invalid = 2
+      group_invalid       = 3
+      group_is_locked     = 4
+      holddate_invalid    = 5
+      internal_error      = 6
+      queue_error         = 7
+      running             = 8
+      system_lock_error   = 9
+      user_invalid        = 10
+      others              = 11.
+  if sy-subrc <> 0.
+* Implement suitable error handling here
+  endif.
+
+endform.
+
+form f_inseri_bdc.
+  call function 'BDC_INSERT'
+    exporting
+      tcode            = 'zcad004'
+*     POST_LOCAL       = NOVBLOCAL
+*     PRINTING         = NOPRINT
+*     SIMUBATCH        = ' '
+*     CTUPARAMS        = ' '
+    tables
+      dynprotab        = t_bdcdata " aqui esta os dados do mapeamento
+    exceptions
+      internal_error   = 1
+      not_open         = 2
+      queue_error      = 3
+      tcode_invalid    = 4
+      printing_invalid = 5
+      posting_invalid  = 6
+      others           = 7.
+  if sy-subrc <> 0.
+    message text-002 type 'I'. " Erro ao abrir pasta.
+  else.
+    refresh t_bdcdata.
+  endif.
+
+endform.
+
+form f_fecha_pasta.
+  call function 'BDC_CLOSE_GROUP'
+   EXCEPTIONS
+     NOT_OPEN          = 1
+     QUEUE_ERROR       = 2
+     OTHERS            = 3
+            .
+  if sy-subrc <> 0.
+* Implement suitable error handling here
+  endif.
+
+endform.
