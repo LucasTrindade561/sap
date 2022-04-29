@@ -1,0 +1,39 @@
+*** PBO
+PROCESS BEFORE OUTPUT.
+  MODULE recuperar_numpd.
+
+  MODULE set_waers.
+
+  MODULE calculo_total.
+
+  MODULE status_0100. " parecido com o perform
+
+  MODULE tb_0100_tab_set. " setar a tab que vai ser processada
+  CALL SUBSCREEN ref1 INCLUDING w_tb_0100-prog
+                                w_tb_0100-subscreen.
+
+  LOOP AT t_zt007 WITH CONTROL tc_0100.
+  ENDLOOP.
+
+*** PAI
+PROCESS AFTER INPUT.
+
+*   modulo para sair qnd tiver exit no botao.
+  MODULE exit_0100 AT EXIT-COMMAND.
+  CALL SUBSCREEN ref1.
+  MODULE tb_0100_tab_get.
+
+* TABLE CONTROL
+  LOOP AT t_zt007.
+    CHAIN.
+      FIELD t_zt007-itmpd.
+      FIELD t_zt007-mater.
+      FIELD t_zt007-quant.
+      FIELD t_zt007-meins.
+      FIELD t_zt007-vlunt.
+      FIELD t_zt007-waers.
+    ENDCHAIN.
+    FIELD t_zt007-mark MODULE mark ON REQUEST.
+  ENDLOOP.
+
+  MODULE user_command_0100.

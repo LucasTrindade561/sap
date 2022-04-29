@@ -1,0 +1,36 @@
+* variaveis
+DATA: v_denom_bukrs TYPE ze002,
+      v_denom_forne TYPE ze002,
+      v_denom_compr TYPE ze002,
+      v_denom_mat   TYPE ze002,
+      v_waers       TYPE waers_curc,
+      v_meins       TYPE msehi,
+      v_itmpd_table TYPE ze0016,
+      v_numpd       TYPE ze0013,
+      vl_itmpd(3)   TYPE c,
+      vl_total      TYPE i.
+
+* Work area
+DATA: wa_zt006 TYPE zt006.
+
+* tabelas internas
+DATA: t_zt007 TYPE TABLE OF ty_zt007 WITH HEADER LINE.
+
+* controls --> table control para saber qual tela onde vai ser exibido os dados do zt007.
+CONTROLS: tc_0100 TYPE TABLEVIEW USING SCREEN 0100.
+
+* constantes
+CONSTANTS: BEGIN OF c_tb_0100,
+             tab1 LIKE sy-ucomm VALUE 'TB_0100_FC1', " codigo de funcao que vamos usar na tabstrip
+             tab2 LIKE sy-ucomm VALUE 'TB_0100_FC2', " codigo de funcao que vamos usar na tabstrip
+           END OF c_tb_0100.
+
+* tabstrip
+CONTROLS: tb_0100 TYPE TABSTRIP.
+
+* work area (tabstrip)
+DATA: BEGIN OF w_tb_0100,
+        subscreen   LIKE sy-dynnr, " armazena o numero da tela
+        prog        LIKE  sy-repid VALUE 'SAPMZ0002',
+        pressed_tab LIKE sy-ucomm VALUE c_tb_0100-tab1, " armazena a tab que foi selecionada
+      END OF w_tb_0100.

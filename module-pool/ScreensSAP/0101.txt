@@ -1,0 +1,17 @@
+PROCESS BEFORE OUTPUT.
+* MODULE STATUS_0101.
+*
+PROCESS AFTER INPUT.
+
+* Campos variavel que aparecem no cabecalho.
+  CHAIN.
+    FIELD wa_zt006-bukrs MODULE valida_bukrs.
+  ENDCHAIN.
+  CHAIN.
+    FIELD wa_zt006-forne MODULE valida_forne.
+  ENDCHAIN.
+  CHAIN.
+    FIELD wa_zt006-compr MODULE valida_compr.
+  ENDCHAIN.
+
+* MODULE USER_COMMAND_0101.

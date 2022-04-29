@@ -1,0 +1,14 @@
+PROCESS BEFORE OUTPUT.
+  MODULE recuperar_itmpd.
+* MODULE STATUS_0200.
+*
+PROCESS AFTER INPUT.
+  CHAIN.
+    FIELD t_zt007-mater MODULE valida_material.
+  ENDCHAIN.
+  CHAIN.
+    FIELD t_zt007-meins MODULE valida_meins.
+  ENDCHAIN.
+
+
+  MODULE user_command_0200.

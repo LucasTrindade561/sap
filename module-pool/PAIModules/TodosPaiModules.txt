@@ -1,0 +1,195 @@
+*&---------------------------------------------------------------------*
+*& Include          MZ0001I01
+*&---------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*&      Module  EXIT_0100  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE exit_0100 INPUT.
+
+  LEAVE PROGRAM.
+
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  MARK  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE mark INPUT.
+
+* Rotina para limpar mark
+  LOOP AT t_zt007 WHERE mark = 'X'.
+    CLEAR t_zt007-mark.
+    MODIFY t_zt007 INDEX sy-tabix TRANSPORTING mark.
+  ENDLOOP.
+
+* Rotina para posicionar mark conforme selecionado (marcar com x a rotina que foi selecionada)
+  READ TABLE t_zt007 INDEX tc_0100-current_line.
+  IF sy-subrc IS INITIAL.
+    t_zt007-mark = 'X'.
+*   modify para atualizar o index selecionado.
+    MODIFY t_zt007 INDEX sy-tabix TRANSPORTING mark.
+  ENDIF.
+
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_0100  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE user_command_0100 INPUT.
+
+  CASE sy-ucomm.
+    WHEN 'ADD'.
+      IF wa_zt006-waers IS INITIAL.
+        MESSAGE TEXT-005 TYPE 'I'.
+      ELSEIF wa_zt006-bukrs IS INITIAL.
+        MESSAGE TEXT-009 TYPE 'I'.
+      ELSE.
+        CLEAR t_zt007.
+        CALL SCREEN 0200 STARTING AT 5 5 ENDING AT 60 13. " posicionamento e tamanho
+      ENDIF.
+    WHEN 'DEL'.
+      DELETE t_zt007 WHERE mark = 'X'.
+      PERFORM f_limpar_v_itmpd.
+    WHEN 'SAVE'.
+      PERFORM f_salva_dados.
+  ENDCASE.
+
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_0200  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE user_command_0200 INPUT.
+  IF sy-ucomm = 'OK'.
+    t_zt007-waers = wa_zt006-waers.
+    APPEND t_zt007.
+    CALL SCREEN 0100.
+  ELSEIF sy-ucomm = 'N_OK'.
+    PERFORM f_limpar_v_itmpd.
+    CALL SCREEN 0100.
+  ENDIF.
+
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  VALIDA_BUKRS  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE valida_bukrs INPUT.
+
+  CLEAR v_denom_bukrs.
+  SELECT SINGLE denom FROM zt002
+    INTO v_denom_bukrs
+  WHERE bukrs = wa_zt006-bukrs.
+
+  IF sy-subrc <> 0.
+    MESSAGE TEXT-001 TYPE 'E'. "Empresa invalida.
+  ENDIF.
+
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  VALIDA_FORNE  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE valida_forne INPUT.
+
+  CLEAR v_denom_forne.
+  SELECT SINGLE denom FROM zt004
+    INTO v_denom_forne
+  WHERE forne = wa_zt006-forne.
+
+  IF sy-subrc <> 0.
+    MESSAGE TEXT-002 TYPE 'E'. "Fornecedor invalida.
+  ENDIF.
+
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  VALIDA_COMPR  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE valida_compr INPUT.
+
+  CLEAR v_denom_compr.
+  SELECT SINGLE denom FROM zt003
+    INTO v_denom_compr
+  WHERE compr = wa_zt006-compr.
+
+  IF sy-subrc <> 0.
+    MESSAGE TEXT-003 TYPE 'E'. "Grupo de compras invalida.
+  ENDIF.
+
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  TB_0100_TAB_GET  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE tb_0100_tab_get INPUT.
+
+  CASE sy-ucomm.
+    WHEN c_tb_0100-tab1.
+      w_tb_0100-pressed_tab = c_tb_0100-tab1.
+
+    WHEN c_tb_0100-tab2.
+      w_tb_0100-pressed_tab = c_tb_0100-tab2.
+    WHEN OTHERS.
+  ENDCASE.
+
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  VALIDA_WAERS  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE valida_waers INPUT.
+
+  CLEAR v_waers.
+  SELECT SINGLE waers FROM tcurc
+    INTO v_waers
+  WHERE waers = wa_zt006-waers.
+
+  IF sy-subrc <> 0.
+    MESSAGE TEXT-007 TYPE 'E'. " Moeda Invalida.
+  ENDIF.
+
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  VALIDA_MATERIAL  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE valida_material INPUT.
+
+  CLEAR v_denom_mat.
+  SELECT SINGLE denom FROM zt005
+    INTO v_denom_mat
+  WHERE mater = t_zt007-mater.
+
+  IF sy-subrc <> 0.
+    MESSAGE TEXT-010 TYPE 'E'. " Material invalido.
+  ENDIF.
+
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  VALIDA_MEINS  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE valida_meins INPUT.
+
+  CLEAR v_meins.
+  SELECT SINGLE msehi FROM t006
+    INTO v_meins
+  WHERE msehi = t_zt007-meins.
+
+  IF sy-subrc <> 0.
+    MESSAGE TEXT-011 TYPE 'E'. " Unidade de Medida invalida.
+  ENDIF.
+
+ENDMODULE.

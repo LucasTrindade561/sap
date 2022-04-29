@@ -1,0 +1,5 @@
+* tipos
+TYPES: BEGIN OF ty_zt007.
+         INCLUDE STRUCTURE zt007. " incluindo todos os campos da tabela zt007 dentro do tipo.
+         TYPES: mark. " incluimos mais um campo desse tipo.
+TYPES: END OF ty_zt007.

@@ -1,0 +1,416 @@
+*&---------------------------------------------------------------------*
+*& Report ZR00034
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT zr00034.
+
+* tabele transparente
+TABLES: zt007, zt005, zt001, zt006.
+
+* tabela interna
+DATA: t_zt007    TYPE TABLE OF zt007,
+      t_zt005    TYPE TABLE OF zt005,
+      t_zt001    TYPE TABLE OF zt001,
+      t_zt006    TYPE TABLE OF zt006,
+      t_saida    TYPE TABLE OF zs0003,
+      t_fieldcat TYPE slis_t_fieldcat_alv,
+      t_sort     TYPE slis_t_sortinfo_alv,
+      t_header   TYPE slis_t_listheader.
+
+* work area
+DATA: wa_zt007    TYPE zt007,
+      wa_zt005    TYPE zt005,
+      wa_zt001    TYPE zt001,
+      wa_zt006    TYPE zt006,
+      wa_saida    TYPE zs0003,
+      wa_fieldcat TYPE slis_fieldcat_alv,
+      wa_sort     TYPE slis_sortinfo_alv,
+      wa_layout   TYPE slis_layout_alv,
+      wa_header   TYPE slis_listheader,
+      wa_variant  TYPE disvariant.
+
+* tela de selecao
+SELECTION-SCREEN BEGIN OF BLOCK bc001 WITH FRAME TITLE TEXT-001. " Seleção de dados
+SELECT-OPTIONS: s_numpd FOR zt007-numpd,
+                s_itmpd FOR zt007-itmpd.
+SELECTION-SCREEN END OF BLOCK bc001.
+
+SELECTION-SCREEN BEGIN OF BLOCK bc002 WITH FRAME TITLE TEXT-002. " Variavel
+PARAMETERS: p_varian TYPE slis_vari.
+SELECTION-SCREEN END OF BLOCK bc002.
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_varian.
+  PERFORM f_variant_f4 CHANGING p_varian.
+
+START-OF-SELECTION.
+  PERFORM f_seleciona_dados.
+  PERFORM f_monta_saida.
+  PERFORM f_monta_alv.
+
+*&---------------------------------------------------------------------*
+*& Form F_SELECIONA_DADOS
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM f_seleciona_dados .
+
+  SELECT * FROM zt007 INTO TABLE t_zt007
+    WHERE numpd IN s_numpd
+          AND itmpd IN s_itmpd.
+
+  IF sy-subrc IS INITIAL.
+    SELECT * FROM zt005 INTO TABLE t_zt005
+      FOR ALL ENTRIES IN t_zt007
+       WHERE mater = t_zt007-mater.
+
+    IF sy-subrc IS INITIAL.
+      SELECT * FROM zt001 INTO TABLE t_zt001
+        FOR ALL ENTRIES IN t_zt005
+          WHERE tpmat = t_zt005-tpmat.
+    ENDIF.
+  ELSE.
+    MESSAGE TEXT-003 TYPE 'I'. " Nao foi encontrado nenhum registro com esses parametros.
+    STOP.
+  ENDIF.
+
+  SELECT * FROM zt006 INTO TABLE t_zt006
+    WHERE numpd IN s_numpd.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form F_MONTA_SAIDA
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM f_monta_saida .
+
+  SORT t_zt007 BY mater.
+  SORT t_zt005 BY mater tpmat.
+  SORT t_zt001 BY tpmat.
+  LOOP AT t_zt007 INTO wa_zt007.
+
+    CLEAR wa_saida.
+    wa_saida-numpd = wa_zt007-numpd.
+    wa_saida-itmpd = wa_zt007-itmpd.
+    wa_saida-mater = wa_zt007-mater.
+
+
+    READ TABLE t_zt005 INTO wa_zt005 WITH KEY mater = wa_zt007-mater BINARY SEARCH.
+    IF sy-subrc IS INITIAL.
+      wa_saida-denom_mt = wa_zt005-denom.
+      wa_saida-tpmat = wa_zt005-tpmat.
+    ENDIF.
+
+
+    READ TABLE t_zt001 INTO wa_zt001 WITH KEY tpmat = wa_zt005-tpmat BINARY SEARCH.
+    IF sy-subrc IS INITIAL.
+      wa_saida-denom_tp = wa_zt001-denom.
+    ENDIF.
+
+    wa_saida-quant = wa_zt007-quant.
+    wa_saida-meins = wa_zt007-meins.
+    wa_saida-vlunt = wa_zt007-vlunt.
+    wa_saida-waers = wa_zt007-waers.
+    APPEND wa_saida TO t_saida.
+
+  ENDLOOP.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form F_MONTA_ALV
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM f_monta_alv .
+
+  PERFORM f_define_fieldcat.
+  PERFORM f_ordena.
+  PERFORM f_layout.
+  PERFORM f_impremi_alv.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form F_DEFINE_FIELDCAT
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM f_define_fieldcat .
+  CALL FUNCTION 'REUSE_ALV_FIELDCATALOG_MERGE'
+    EXPORTING
+      i_program_name         = sy-repid
+      i_internal_tabname     = 'T_SAIDA'
+      i_structure_name       = 'ZS0003'
+*     I_CLIENT_NEVER_DISPLAY = 'X'
+*     I_INCLNAME             =
+*     I_BYPASSING_BUFFER     =
+*     I_BUFFER_ACTIVE        =
+    CHANGING
+      ct_fieldcat            = t_fieldcat
+    EXCEPTIONS
+      inconsistent_interface = 1
+      program_error          = 2
+      OTHERS                 = 3.
+  IF sy-subrc <> 0.
+    MESSAGE TEXT-004 TYPE 'I'.
+  ELSE.
+    LOOP AT t_fieldcat INTO wa_fieldcat.
+      CASE wa_fieldcat-fieldname.
+        WHEN 'MEINS'.
+          wa_fieldcat-seltext_s = wa_fieldcat-seltext_m = wa_fieldcat-seltext_l = wa_fieldcat-reptext_ddic = TEXT-005. " Unidade de Medida (UdM)
+        WHEN 'WAERS'.
+          wa_fieldcat-seltext_s = wa_fieldcat-seltext_m = wa_fieldcat-seltext_l = wa_fieldcat-reptext_ddic = TEXT-006. " Moeda
+        WHEN 'NUMPD'.
+          wa_fieldcat-hotspot = 'X'.
+        WHEN 'QUANT'.
+          wa_fieldcat-edit = 'X'.
+        WHEN 'VLUNT'.
+          wa_fieldcat-edit = 'X'.
+      ENDCASE.
+      MODIFY t_fieldcat FROM wa_fieldcat INDEX sy-tabix TRANSPORTING seltext_s seltext_m seltext_l reptext_ddic hotspot edit.
+    ENDLOOP.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form F_ORDENA
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM f_ordena .
+  CLEAR wa_sort.
+  wa_sort-spos = 1.
+  wa_sort-fieldname = 'NUMPD'.
+  wa_sort-tabname = 'T_SAIDA'.
+  wa_sort-up = 'X'.
+  APPEND wa_sort TO t_sort.
+
+  CLEAR wa_sort.
+  wa_sort-spos = 2.
+  wa_sort-fieldname = 'ITMPD'.
+  wa_sort-tabname = 'T_SAIDA'.
+  APPEND wa_sort TO t_sort.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form F_LAYOUT
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM f_layout .
+  wa_layout-zebra = 'X'.
+  wa_layout-colwidth_optimize = 'X'.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form F_IMPREMI_ALV
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM f_impremi_alv .
+
+  wa_variant-variant = p_varian.
+
+  CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+    EXPORTING
+*     I_INTERFACE_CHECK       = ' '
+*     I_BYPASSING_BUFFER      = ' '
+*     I_BUFFER_ACTIVE         = ' '
+      i_callback_program      = sy-repid
+*     I_CALLBACK_PF_STATUS_SET          = ' '
+      i_callback_user_command = 'USER_COMMAND'
+*     I_CALLBACK_TOP_OF_PAGE  = ' '
+*     I_CALLBACK_HTML_TOP_OF_PAGE       = ' '
+*     I_CALLBACK_HTML_END_OF_LIST       = ' '
+*     I_STRUCTURE_NAME        =
+*     I_BACKGROUND_ID         = ' '
+*     I_GRID_TITLE            =
+*     I_GRID_SETTINGS         =
+      is_layout               = wa_layout
+      it_fieldcat             = t_fieldcat
+*     IT_EXCLUDING            =
+*     IT_SPECIAL_GROUPS       =
+      it_sort                 = t_sort
+*     IT_FILTER               =
+*     IS_SEL_HIDE             =
+*     i_default               = 'X'
+      i_save                  = 'X'
+      is_variant              = wa_variant
+*     IT_EVENTS               =
+*     IT_EVENT_EXIT           =
+*     IS_PRINT                =
+*     IS_REPREP_ID            =
+*     I_SCREEN_START_COLUMN   = 0
+*     I_SCREEN_START_LINE     = 0
+*     I_SCREEN_END_COLUMN     = 0
+*     I_SCREEN_END_LINE       = 0
+*     I_HTML_HEIGHT_TOP       = 0
+*     I_HTML_HEIGHT_END       = 0
+*     IT_ALV_GRAPHICS         =
+*     IT_HYPERLINK            =
+*     IT_ADD_FIELDCAT         =
+*     IT_EXCEPT_QINFO         =
+*     IR_SALV_FULLSCREEN_ADAPTER        =
+*   IMPORTING
+*     E_EXIT_CAUSED_BY_CALLER =
+*     ES_EXIT_CAUSED_BY_USER  =
+    TABLES
+      t_outtab                = t_saida
+    EXCEPTIONS
+      program_error           = 1
+      OTHERS                  = 2.
+  IF sy-subrc <> 0.
+    MESSAGE TEXT-007 TYPE 'I'.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form F_VARIANT_F4
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*&      <-- P_VARIAN
+*&---------------------------------------------------------------------*
+FORM f_variant_f4  CHANGING p_p_varian.
+
+  DATA: vl_variant TYPE disvariant.
+  vl_variant-report = sy-repid.
+
+  CALL FUNCTION 'REUSE_ALV_VARIANT_F4'
+    EXPORTING
+      is_variant    = vl_variant
+*     I_TABNAME_HEADER          =
+*     I_TABNAME_ITEM            =
+*     IT_DEFAULT_FIELDCAT       =
+      i_save        = 'A'
+*     I_DISPLAY_VIA_GRID        = ' '
+    IMPORTING
+*     E_EXIT        =
+      es_variant    = vl_variant
+    EXCEPTIONS
+      not_found     = 1
+      program_error = 2
+      OTHERS        = 3.
+  IF sy-subrc EQ 0.
+    p_p_varian = vl_variant-variant.
+  ENDIF.
+
+ENDFORM.
+
+FORM user_command USING r_ucomm LIKE sy-ucomm
+                        rs_selfield TYPE slis_selfield.
+
+  DATA: tl_vimsellist TYPE STANDARD TABLE OF vimsellist,
+        wl_vimsellist TYPE vimsellist.
+
+  IF rs_selfield-sel_tab_field = 'T_SAIDA-NUMPD'.
+
+    wl_vimsellist-viewfield = 'NUMPD'.
+    wl_vimsellist-operator  = 'EQ'.
+    wl_vimsellist-value     = rs_selfield-value.
+    APPEND wl_vimsellist TO tl_vimsellist.
+
+    CALL FUNCTION 'VIEW_MAINTENANCE_CALL'
+      EXPORTING
+        action                       = 'S'
+*       CORR_NUMBER                  = '          '
+*       GENERATE_MAINT_TOOL_IF_MISSING       = ' '
+*       SHOW_SELECTION_POPUP         = ' '
+        view_name                    = 'ZT007'
+*       NO_WARNING_FOR_CLIENTINDEP   = ' '
+*       RFC_DESTINATION_FOR_UPGRADE  = ' '
+*       CLIENT_FOR_UPGRADE           = ' '
+*       VARIANT_FOR_SELECTION        = ' '
+*       COMPLEX_SELCONDS_USED        = ' '
+*       CHECK_DDIC_MAINFLAG          = ' '
+*       SUPPRESS_WA_POPUP            = ' '
+      TABLES
+        dba_sellist                  = tl_vimsellist
+*       EXCL_CUA_FUNCT               =
+      EXCEPTIONS
+        client_reference             = 1
+        foreign_lock                 = 2
+        invalid_action               = 3
+        no_clientindependent_auth    = 4
+        no_database_function         = 5
+        no_editor_function           = 6
+        no_show_auth                 = 7
+        no_tvdir_entry               = 8
+        no_upd_auth                  = 9
+        only_show_allowed            = 10
+        system_failure               = 11
+        unknown_field_in_dba_sellist = 12
+        view_not_found               = 13
+        maintenance_prohibited       = 14
+        OTHERS                       = 15.
+    IF sy-subrc <> 0.
+      MESSAGE TEXT-008 TYPE 'I'. " Registro não encontrado.
+    ENDIF.
+  ELSEIF r_ucomm = '&DATA_SAVE'.
+    SORT t_zt007 BY numpd itmpd.
+    SORT t_zt006 BY numpd.
+    LOOP AT t_saida INTO wa_saida.
+
+      READ TABLE t_zt007 INTO wa_zt007 WITH KEY numpd = wa_saida-numpd itmpd = wa_saida-itmpd BINARY SEARCH.
+      IF sy-subrc = 0.
+        READ TABLE t_zt006 INTO wa_zt006 WITH KEY numpd = wa_saida-numpd BINARY SEARCH.
+        IF sy-subrc = 0.
+          PERFORM f_calculo_valor.
+          IF sy-subrc = 0.
+            UPDATE zt007 SET quant = wa_saida-quant vlunt = wa_saida-vlunt WHERE numpd = wa_saida-numpd AND itmpd = wa_saida-itmpd.
+            COMMIT WORK.
+          ENDIF.
+        ENDIF.
+
+      ENDIF.
+
+    ENDLOOP.
+  ENDIF.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form F_CALCULO_VALOR
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM f_calculo_valor .
+
+  CLEAR wa_zt006-numpd.
+  wa_zt006-vlbru = wa_zt006-numpd + ( wa_saida-vlunt * wa_saida-quant ).
+  PERFORM f_salvar_zt006.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form F_SALVAR_ZT006
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM f_salvar_zt006 .
+
+  CLEAR zt006.
+  MOVE-CORRESPONDING wa_zt006 TO zt006.
+  MODIFY zt006.
+
+ENDFORM.

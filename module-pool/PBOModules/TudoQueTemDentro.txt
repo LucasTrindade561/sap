@@ -1,0 +1,135 @@
+NO SAP FICA DIVIDIDO POR CADA MODULE
+
+*&---------------------------------------------------------------------*
+*& Include          MZ0001O01
+*&---------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*& Module STATUS_0100 OUTPUT
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+MODULE status_0100 OUTPUT.
+
+  SET PF-STATUS 'PF-0100'. " determina aonde os botoes vao ficar na tela
+  SET TITLEBAR 'TL-0100'. " definir o titulo da tela (Criar Pedido de Compras)
+
+  LOOP AT SCREEN.
+    IF screen-name = 'WA_ZT006-BUKRS' AND wa_zt006-bukrs <> space.
+      screen-input = 0.
+    ENDIF.
+    IF screen-name = 'WA_ZT006-FORNE' AND wa_zt006-forne <> space.
+      screen-input = 0.
+    ENDIF.
+    IF screen-name = 'WA_ZT006-COMPR' AND wa_zt006-compr <> space.
+      screen-input = 0.
+    ENDIF.
+    IF screen-name = 'WA_ZT006-WAERS' AND wa_zt006-waers <> space.
+      screen-input = 0.
+    ENDIF.
+
+*    Nao tem isso aqui (Tratamento de group)
+*    if screen-group1 = 'GR1'.
+*      screen-invisible = 1.
+*    endif.
+
+    MODIFY SCREEN.
+
+  ENDLOOP.
+
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*& Module CALCULO_TOTAL OUTPUT
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+MODULE calculo_total OUTPUT.
+
+  CLEAR wa_zt006-vlbru.
+
+  LOOP AT t_zt007.
+    TRY.
+        wa_zt006-vlbru = wa_zt006-vlbru + ( t_zt007-vlunt * t_zt007-quant ).
+      CATCH cx_sy_arithmetic_overflow.
+        MESSAGE TEXT-008 TYPE 'E'. " Valor bruto grande demais. Crie um numpd para essa compra.
+        STOP.
+    ENDTRY.
+  ENDLOOP.
+
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*& Module TB_0100_TAB_SET OUTPUT
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+MODULE tb_0100_tab_set OUTPUT.
+
+  tb_0100-activetab = w_tb_0100-pressed_tab. " passa a tab que esta ativa
+
+  CASE w_tb_0100-pressed_tab.
+    WHEN c_tb_0100-tab1. " funcao que passamos la
+      w_tb_0100-subscreen = '0101'.
+    WHEN c_tb_0100-tab2. " funcao que passamos la
+      w_tb_0100-subscreen = '0102'.
+    WHEN OTHERS.
+  ENDCASE.
+
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  RECUPERAR_NUMPD  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*& Module RECUPERAR_NUMPD OUTPUT
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+MODULE recuperar_numpd OUTPUT.
+
+  CLEAR wa_zt006-numpd.
+
+  SELECT MAX( zt006~numpd ) FROM zt006 INTO v_numpd.
+  IF sy-subrc = 0.
+    vl_total = v_numpd + 1.
+    wa_zt006-numpd = vl_total.
+  ENDIF.
+
+  CLEAR: vl_total, v_numpd.
+
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*& Module RECUPERAR_ITMPD OUTPUT
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+MODULE recuperar_itmpd OUTPUT.
+  CLEAR t_zt007.
+
+  IF vl_itmpd <> space.
+    SORT t_zt007 BY itmpd.
+    LOOP AT t_zt007.
+      READ TABLE t_zt007 WITH KEY itmpd = t_zt007-itmpd BINARY SEARCH.
+      IF sy-subrc = 0.
+        MOVE t_zt007-itmpd TO v_itmpd_table.
+        vl_itmpd = v_itmpd_table + 1.
+      ENDIF.
+
+      CLEAR: v_itmpd_table, t_zt007.
+      t_zt007-itmpd = vl_itmpd.
+    ENDLOOP.
+  ELSE.
+    t_zt007-itmpd = 1.
+    vl_itmpd = 1.
+  ENDIF.
+
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*& Module SET_WAERS OUTPUT
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+MODULE set_waers OUTPUT.
+
+  wa_zt006-waers = 'USD'.
+
+ENDMODULE.

@@ -1,0 +1,1 @@
+TABLES: zt006, zt007, tcurc.
