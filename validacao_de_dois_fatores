@@ -1,0 +1,19 @@
+  CLEAR v_werks.
+  SELECT SINGLE werks FROM zt008w
+    INTO v_werks
+  WHERE werks = t_zt007-werks.
+
+  IF sy-subrc <> 0.
+    MESSAGE TEXT-013 TYPE 'E'. " Centro/Filial invalido.
+  ELSE.
+    CLEAR v_werks.
+    SELECT SINGLE werks FROM zt008w
+      INTO v_werks
+    WHERE werks = t_zt007-werks
+      AND bukrs = wa_zt006-bukrs.
+
+    IF sy-subrc <> 0.
+      MESSAGE TEXT-014 TYPE 'E'. " Centro/Filial não pertence a empresa setada.
+    ENDIF.
+
+  ENDIF.
