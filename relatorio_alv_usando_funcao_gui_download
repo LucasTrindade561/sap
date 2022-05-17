@@ -1,0 +1,587 @@
+*&---------------------------------------------------------------------*
+*& Report ZMMR_001
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT zmmr_001.
+
+* tabela transparente
+TABLES: zt008, zt008w.
+
+INCLUDE <icon>.
+
+* tipos
+TYPES: BEGIN OF ty_empresa,
+         bukrs TYPE bukrs,
+       END OF ty_empresa.
+
+
+TYPES: BEGIN OF ty_header,
+         line(264) TYPE c,
+       END OF ty_header.
+
+TYPES: BEGIN OF ty_csv,
+         line(264) TYPE c,
+       END OF ty_csv.
+
+
+* variaveis
+DATA: vl_bukrs   TYPE bukrs,
+      vl_werks   TYPE werks_d,
+      vl_s_bukrs TYPE bukrs,
+      vl_s_werks TYPE werks_d,
+      v_gtreturn TYPE zsgtreturn.
+
+* tabela interna
+DATA: tl_empresa   TYPE TABLE OF ty_empresa,
+      t_arquivo    TYPE TABLE OF ty_csv,
+      t_zsgtfilial TYPE TABLE OF zsgtfilial,
+      t_saida      TYPE TABLE OF zsmmr001,
+      t_heading    TYPE TABLE OF ty_header,
+      t_fieldcat   TYPE slis_t_fieldcat_alv.
+
+* work area
+DATA: wa_empresa    TYPE  ty_empresa,
+      wa_arquivo    TYPE  ty_csv,
+      wa_zsgtfilial TYPE  zsgtfilial,
+      wa_saida      TYPE  zsmmr001,
+      wa_fieldcat   TYPE  slis_fieldcat_alv,
+      wa_heading    TYPE  ty_header,
+      wa_layout     TYPE  slis_layout_alv.
+
+SELECTION-SCREEN BEGIN OF BLOCK bc001 WITH FRAME TITLE TEXT-003. " Seleção de dados
+SELECT-OPTIONS: s_bukrs      FOR vl_bukrs OBLIGATORY,
+                s_werks      FOR vl_werks,
+                s_ort01      FOR zt008-ort01,
+                s_land1      FOR zt008w-land1,
+                s_regio      FOR zt008w-regio,
+                s_dt_cri     FOR zt008-data_cri,
+                s_da_alt     FOR zt008-data_alter.
+PARAMETERS: p_cr_por TYPE zt008w-criado_por,
+            p_md_por TYPE zt008w-modif_por.
+SELECTION-SCREEN END OF BLOCK bc001.
+
+SELECTION-SCREEN BEGIN OF BLOCK bc002 WITH FRAME TITLE TEXT-002.
+PARAMETERS: p_visu  RADIOBUTTON GROUP gr1,
+            p_gerar RADIOBUTTON GROUP gr1,
+            p_file  TYPE localfile.
+SELECTION-SCREEN END OF BLOCK bc002.
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_file.
+  PERFORM f_seleciona_arquivo.
+
+START-OF-SELECTION.
+  PERFORM f_bukrs_zt008.
+  PERFORM f_selecionar_dados.
+  PERFORM f_monta_saida.
+  PERFORM f_tipo_process.
+
+END-OF-SELECTION.
+
+*&---------------------------------------------------------------------*
+*& Form F_BUKRS_ZT008
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM f_bukrs_zt008 .
+  IF s_bukrs[] IS NOT INITIAL.
+    SELECT zt008~bukrs FROM zt008 INTO TABLE tl_empresa WHERE bukrs IN s_bukrs.
+  ENDIF.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form F_SELECIONAR_DADOS
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM f_selecionar_dados .
+
+  DATA: vl_centro(4) TYPE c.
+
+  CLEAR vl_centro.
+  LOOP AT tl_empresa INTO wa_empresa.
+    IF s_werks IS NOT INITIAL.
+      IF s_werks-low IS NOT INITIAL AND  s_werks-high IS INITIAL.
+        vl_centro = s_werks-low.
+      ENDIF.
+    ENDIF.
+
+    CALL FUNCTION 'Z_GET_BUKRS_WERKS'
+      EXPORTING
+        iv_bukrs   = wa_empresa-bukrs
+        iv_werks   = vl_centro
+      IMPORTING
+        gt_return  = v_gtreturn
+      TABLES
+        gt_filiais = t_zsgtfilial.
+    IF sy-subrc = 0.
+      DELETE t_zsgtfilial WHERE NOT werks IN s_werks.
+    ENDIF.
+    MESSAGE v_gtreturn-message TYPE v_gtreturn-type.
+  ENDLOOP.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form F_TIPO_PROCESS
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM f_tipo_process .
+
+  IF p_visu = 'X'.
+    PERFORM f_monta_alv.
+  ELSE.
+    PERFORM f_popup.
+    PERFORM f_download.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form F_MONTA_ALV
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM f_monta_alv .
+
+  PERFORM f_define_fieldcat.
+  PERFORM f_layout.
+  PERFORM f_impremi_alv.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form F_SAIDA
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM f_monta_saida .
+
+  DATA: vl_data TYPE c.
+
+  LOOP AT t_zsgtfilial INTO wa_zsgtfilial.
+    CLEAR: wa_saida, vl_data.
+
+    wa_saida-datum = sy-datum.
+    wa_saida-uzeit = sy-uzeit.
+    wa_saida-bukrs = wa_zsgtfilial-bukrs.
+    wa_saida-butxt = wa_zsgtfilial-butxt.
+    wa_saida-ort01e = wa_zsgtfilial-ort01e.
+    wa_saida-werks = wa_zsgtfilial-werks.
+    wa_saida-name1 = wa_zsgtfilial-name1.
+    wa_saida-stras = wa_zsgtfilial-stras.
+    wa_saida-pstlz = wa_zsgtfilial-pstlz.
+    wa_saida-ort01c = wa_zsgtfilial-ort01c.
+    wa_saida-criado_por = wa_zsgtfilial-criado_por.
+    wa_saida-data_cri = wa_zsgtfilial-data_cri.
+    wa_saida-hora_cri = wa_zsgtfilial-hora_cri.
+    wa_saida-modif_por = wa_zsgtfilial-modif_por.
+    wa_saida-data_alter = wa_zsgtfilial-data_alter.
+    wa_saida-hora_alter = wa_zsgtfilial-hora_alter.
+
+    vl_data = sy-datum - wa_saida-data_cri.
+    wa_saida-dias_cad =  vl_data.
+
+    IF wa_saida-dias_cad < 10.
+      wa_saida-icon = '@0A@'.
+    ELSEIF wa_saida-dias_cad >= 10 OR wa_saida-dias_cad <= 30.
+      wa_saida-icon = '@09@'.
+    ELSE.
+      wa_saida-icon = '@08@'.
+    ENDIF.
+
+    APPEND wa_saida TO t_saida.
+
+  ENDLOOP.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form F_DEFINE_FIELDCAT
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM f_define_fieldcat .
+
+  CALL FUNCTION 'REUSE_ALV_FIELDCATALOG_MERGE'
+    EXPORTING
+      i_program_name         = sy-repid
+      i_internal_tabname     = 'T_SAIDA'
+      i_structure_name       = 'ZSMMR001'
+*     I_CLIENT_NEVER_DISPLAY = 'X'
+*     I_INCLNAME             =
+*     I_BYPASSING_BUFFER     =
+*     I_BUFFER_ACTIVE        =
+    CHANGING
+      ct_fieldcat            = t_fieldcat
+    EXCEPTIONS
+      inconsistent_interface = 1
+      program_error          = 2
+      OTHERS                 = 3.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ELSE.
+    LOOP AT t_fieldcat INTO wa_fieldcat.
+      CASE wa_fieldcat-fieldname.
+        WHEN 'DATUM'.
+          wa_fieldcat-seltext_s = wa_fieldcat-seltext_m = wa_fieldcat-seltext_l = wa_fieldcat-reptext_ddic = TEXT-005.
+          wa_fieldcat-key = 'X'.
+        WHEN 'UZEIT'.
+          wa_fieldcat-seltext_s = wa_fieldcat-seltext_m = wa_fieldcat-seltext_l = wa_fieldcat-reptext_ddic = TEXT-006.
+          wa_fieldcat-key = 'X'.
+        WHEN 'BUKRS'.
+          wa_fieldcat-seltext_s = wa_fieldcat-seltext_m = wa_fieldcat-seltext_l = wa_fieldcat-reptext_ddic = TEXT-007.
+          wa_fieldcat-key = 'X'.
+        WHEN 'BUTXT'.
+          wa_fieldcat-seltext_s = wa_fieldcat-seltext_m = wa_fieldcat-seltext_l = wa_fieldcat-reptext_ddic = TEXT-008.
+        WHEN 'ORT01E'.
+          wa_fieldcat-seltext_s = wa_fieldcat-seltext_m = wa_fieldcat-seltext_l = wa_fieldcat-reptext_ddic = TEXT-009.
+        WHEN 'WERKS'.
+          wa_fieldcat-seltext_s = wa_fieldcat-seltext_m = wa_fieldcat-seltext_l = wa_fieldcat-reptext_ddic = TEXT-010.
+          wa_fieldcat-emphasize = 'C311'. " cor
+        WHEN 'NAME1'.
+          wa_fieldcat-seltext_s = wa_fieldcat-seltext_m = wa_fieldcat-seltext_l = wa_fieldcat-reptext_ddic = TEXT-011.
+        WHEN 'STRAS'.
+          wa_fieldcat-seltext_s = wa_fieldcat-seltext_m = wa_fieldcat-seltext_l = wa_fieldcat-reptext_ddic = TEXT-012.
+        WHEN 'PSTLZ'.
+          wa_fieldcat-seltext_s = wa_fieldcat-seltext_m = wa_fieldcat-seltext_l = wa_fieldcat-reptext_ddic = TEXT-013.
+        WHEN 'ORT01C'.
+          wa_fieldcat-seltext_s = wa_fieldcat-seltext_m = wa_fieldcat-seltext_l = wa_fieldcat-reptext_ddic = TEXT-014.
+        WHEN 'CRIADO_POR'.
+          wa_fieldcat-seltext_s = wa_fieldcat-seltext_m = wa_fieldcat-seltext_l = wa_fieldcat-reptext_ddic = TEXT-015.
+        WHEN 'DATA_CRI'.
+          wa_fieldcat-seltext_s = wa_fieldcat-seltext_m = wa_fieldcat-seltext_l = wa_fieldcat-reptext_ddic = TEXT-016.
+        WHEN 'HORA_CRI'.
+          wa_fieldcat-seltext_s = wa_fieldcat-seltext_m = wa_fieldcat-seltext_l = wa_fieldcat-reptext_ddic = TEXT-017.
+        WHEN 'MODIF_POR'.
+          wa_fieldcat-seltext_s = wa_fieldcat-seltext_m = wa_fieldcat-seltext_l = wa_fieldcat-reptext_ddic = TEXT-018.
+        WHEN 'DATA_ALTER'.
+          wa_fieldcat-seltext_s = wa_fieldcat-seltext_m = wa_fieldcat-seltext_l = wa_fieldcat-reptext_ddic = TEXT-019.
+        WHEN 'HORA_ALTER'.
+          wa_fieldcat-seltext_s = wa_fieldcat-seltext_m = wa_fieldcat-seltext_l = wa_fieldcat-reptext_ddic = TEXT-020.
+        WHEN 'DIAS_CAD'.
+          wa_fieldcat-seltext_s = wa_fieldcat-seltext_m = wa_fieldcat-seltext_l = wa_fieldcat-reptext_ddic = TEXT-021.
+        WHEN 'ICON'.
+          wa_fieldcat-seltext_s = wa_fieldcat-seltext_m = wa_fieldcat-seltext_l = wa_fieldcat-reptext_ddic = TEXT-022.
+      ENDCASE.
+      MODIFY t_fieldcat FROM wa_fieldcat INDEX sy-tabix TRANSPORTING key emphasize checkbox seltext_s seltext_m seltext_l reptext_ddic.
+    ENDLOOP.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form F_IMPREMI_ALV
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM f_impremi_alv .
+
+  CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+    EXPORTING
+*     I_INTERFACE_CHECK        = ' '
+*     I_BYPASSING_BUFFER       = ' '
+*     I_BUFFER_ACTIVE          = ' '
+      i_callback_program       = sy-repid
+      i_callback_pf_status_set = 'FORM_MENU'
+*     I_CALLBACK_USER_COMMAND  = ' '
+*     I_CALLBACK_TOP_OF_PAGE   = ' '
+*     I_CALLBACK_HTML_TOP_OF_PAGE       = ' '
+*     I_CALLBACK_HTML_END_OF_LIST       = ' '
+*     I_STRUCTURE_NAME         =
+*     I_BACKGROUND_ID          = ' '
+*     I_GRID_TITLE             =
+*     I_GRID_SETTINGS          =
+      is_layout                = wa_layout
+      it_fieldcat              = t_fieldcat
+*     IT_EXCLUDING             =
+*     IT_SPECIAL_GROUPS        =
+*     IT_SORT                  =
+*     IT_FILTER                =
+*     IS_SEL_HIDE              =
+*     I_DEFAULT                = 'X'
+      i_save                   = 'A'
+*     IS_VARIANT               =
+*     IT_EVENTS                =
+*     IT_EVENT_EXIT            =
+*     IS_PRINT                 =
+*     IS_REPREP_ID             =
+*     I_SCREEN_START_COLUMN    = 0
+*     I_SCREEN_START_LINE      = 0
+*     I_SCREEN_END_COLUMN      = 0
+*     I_SCREEN_END_LINE        = 0
+*     I_HTML_HEIGHT_TOP        = 0
+*     I_HTML_HEIGHT_END        = 0
+*     IT_ALV_GRAPHICS          =
+*     IT_HYPERLINK             =
+*     IT_ADD_FIELDCAT          =
+*     IT_EXCEPT_QINFO          =
+*     IR_SALV_FULLSCREEN_ADAPTER        =
+*   IMPORTING
+*     E_EXIT_CAUSED_BY_CALLER  =
+*     ES_EXIT_CAUSED_BY_USER   =
+    TABLES
+      t_outtab                 = t_saida
+    EXCEPTIONS
+      program_error            = 1
+      OTHERS                   = 2.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form F_LAYOUT
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM f_layout .
+
+  wa_layout-zebra = 'X'.
+  wa_layout-colwidth_optimize = 'X'.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form F_DOWNLOAD
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM f_download .
+  DATA: vl_filename TYPE string.
+  FIELD-SYMBOLS <tabela> TYPE STANDARD TABLE.
+
+  CONCATENATE p_file '.txt' INTO vl_filename.
+
+  PERFORM f_formatar_header_download.
+
+  PERFORM f_formatar_saida.
+
+  CALL FUNCTION 'GUI_DOWNLOAD'
+    EXPORTING
+*     BIN_FILESIZE            =
+      filename                = vl_filename
+      filetype                = 'ASC'
+*     APPEND                  = ' '
+      write_field_separator   = 'X'
+*     HEADER                  = '00'
+*     TRUNC_TRAILING_BLANKS   = ' '
+*     WRITE_LF                = 'X'
+*     COL_SELECT              = ' '
+*     COL_SELECT_MASK         = ' '
+*     DAT_MODE                = ' '
+*     CONFIRM_OVERWRITE       = ' '
+*     NO_AUTH_CHECK           = ' '
+*     CODEPAGE                = ' '
+*     IGNORE_CERR             = ABAP_TRUE
+*     REPLACEMENT             = '#'
+*     WRITE_BOM               = ' '
+*     TRUNC_TRAILING_BLANKS_EOL       = 'X'
+*     WK1_N_FORMAT            = ' '
+*     WK1_N_SIZE              = ' '
+*     WK1_T_FORMAT            = ' '
+*     WK1_T_SIZE              = ' '
+*     WRITE_LF_AFTER_LAST_LINE        = ABAP_TRUE
+*     SHOW_TRANSFER_STATUS    = ABAP_TRUE
+*     VIRUS_SCAN_PROFILE      = '/SCET/GUI_DOWNLOAD'
+*   IMPORTING
+*     FILELENGTH              =
+    TABLES
+      data_tab                = t_arquivo
+      fieldnames              = t_heading
+    EXCEPTIONS
+      file_write_error        = 1
+      no_batch                = 2
+      gui_refuse_filetransfer = 3
+      invalid_type            = 4
+      no_authority            = 5
+      unknown_error           = 6
+      header_not_allowed      = 7
+      separator_not_allowed   = 8
+      filesize_not_allowed    = 9
+      header_too_long         = 10
+      dp_error_create         = 11
+      dp_error_send           = 12
+      dp_error_write          = 13
+      unknown_dp_error        = 14
+      access_denied           = 15
+      dp_out_of_memory        = 16
+      disk_full               = 17
+      dp_timeout              = 18
+      file_not_found          = 19
+      dataprovider_exception  = 20
+      control_flush_error     = 21
+      OTHERS                  = 22.
+  IF sy-subrc <> 0.
+    MESSAGE TEXT-001 TYPE 'I'. " Erro ao fazer download dos dados.
+  ENDIF.
+
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form F_POPUP
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM f_popup .
+
+  DATA vl_ans(1) TYPE c.
+
+  CALL FUNCTION 'POPUP_TO_CONFIRM'
+    EXPORTING
+*     TITLEBAR              = ' '
+*     DIAGNOSE_OBJECT       = ' '
+      text_question         = 'Você deseja gerar arquivo para os dados selecionados??'
+      text_button_1         = 'Sim'
+      icon_button_1         = 'ICON_CHECKED'
+      text_button_2         = 'Não'
+      icon_button_2         = 'ICON_CANCEL'
+*     DEFAULT_BUTTON        = '1'
+      display_cancel_button = space
+*     USERDEFINED_F1_HELP   = ' '
+*     START_COLUMN          = 25
+*     START_ROW             = 6
+      popup_type            = 'ICON_MESSAGE_ERROR'
+*     IV_QUICKINFO_BUTTON_1 = ' '
+*     IV_QUICKINFO_BUTTON_2 = ' '
+    IMPORTING
+      answer                = vl_ans
+* TABLES
+*     PARAMETER             =
+    EXCEPTIONS
+      text_not_found        = 1
+      OTHERS                = 2.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+  IF vl_ans = 2.
+    LEAVE PROGRAM.
+  ENDIF.
+
+ENDFORM.
+FORM form_menu USING rt_extab TYPE slis_t_extab.
+  SET PF-STATUS 'STANDARD_STATUS'.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form F_SELECIONA_ARQUIVO
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM f_seleciona_arquivo .
+
+  CALL FUNCTION 'KD_GET_FILENAME_ON_F4'
+    EXPORTING
+*     PROGRAM_NAME        = SYST-REPID
+*     DYNPRO_NUMBER       = SYST-DYNNR
+      field_name = p_file
+*     STATIC     = ' '
+*     MASK       = ' '
+*     FILEOPERATION       = 'R'
+*     PATH       =
+    CHANGING
+      file_name  = p_file
+*     LOCATION_FLAG       = 'P'
+*   EXCEPTIONS
+*     MASK_TOO_LONG       = 1
+*     OTHERS     = 2
+    .
+  IF sy-subrc <> 0.
+    MESSAGE TEXT-004 TYPE 'I'. " Erro ao selecionar arquivo.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form F_FORMATAR_HEADER_DOWNLOAD
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM f_formatar_header_download.
+
+  CONCATENATE TEXT-005 ';'
+              TEXT-006 ';'
+              TEXT-007 ';'
+              TEXT-008 ';'
+              TEXT-009 ';'
+              TEXT-010 ';'
+              TEXT-011 ';'
+              TEXT-012 ';'
+              TEXT-013 ';'
+              TEXT-014 ';'
+              TEXT-015 ';'
+              TEXT-016 ';'
+              TEXT-017 ';'
+              TEXT-018 ';'
+              TEXT-019 ';'
+              TEXT-020 ';'
+              TEXT-021
+  INTO wa_heading.
+
+  APPEND wa_heading TO t_heading.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form F_FORMATAR_SAIDA
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM f_formatar_saida .
+
+  LOOP AT t_saida INTO wa_saida.
+    CONCATENATE wa_saida-datum ';'
+    wa_saida-uzeit ';'
+    wa_saida-bukrs ';'
+    wa_saida-butxt ';'
+    wa_saida-ort01e ';'
+    wa_saida-werks ';'
+    wa_saida-name1 ';'
+    wa_saida-stras ';'
+    wa_saida-pstlz ';'
+    wa_saida-ort01c ';'
+    wa_saida-criado_por ';'
+    wa_saida-data_cri ';'
+    wa_saida-hora_cri ';'
+    wa_saida-modif_por';'
+    wa_saida-data_alter ';'
+    wa_saida-hora_alter  ';'
+    wa_saida-dias_cad INTO wa_arquivo.
+
+    APPEND wa_arquivo TO t_arquivo.
+
+  ENDLOOP.
+
+
+ENDFORM.
